@@ -2,11 +2,28 @@
 //
 
 #include "pch.h"
+#include "OP.h"
+#include "Rastriging.h"
+
 #include <iostream>
+#include <vector>
+
+
+
+static void test(OP &op) {
+	std::vector<std::vector<float>> range = op.getSearchRange();
+	
+	for(int i = 0; i < range.size(); i++) {
+		for(int j = 0; j < range.size(); j++) {
+			std::cout << "index " << i << j << " = " << range[i][j] << std::endl;
+		}
+	}
+}
 
 int main()
 {
-    std::cout << "Hello World!\n"; 
+	Rastriging problem;
+	test(problem);
 }
 
 // Run program: Ctrl + F5 or Debug > Start Without Debugging menu
