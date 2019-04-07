@@ -13,7 +13,7 @@ public:
 	std::vector<Particle*> particles;
 
 	/* Best value of current generation. */
-	float bestVal = FLT_MAX;
+	float bestVal = 100000;
 	/* Index of the best particle. */
 	int bestParticleIdx = 0;
 
