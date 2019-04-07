@@ -29,7 +29,6 @@ public:
 	/* Optimization problem. */
 	OP &op;
 
-
 	/**
 	Create a new particle.
 
@@ -38,6 +37,7 @@ public:
 	@param problem  Optimization problem to be solved.
 	*/
 	Particle(std::vector<float> initialX, std::vector<float> initialV, OP &problem);
+
 	~Particle();
 
 	/**
@@ -48,19 +48,20 @@ public:
 	 */
 	void update(std::vector<float> direction);
 
-
-
 	/**
 	Print something to standard stream. 
 	*/
 	void print();
 
 private:
-	/* Cognitive coefficient. */
+	/* Cognitive coefficient. Bigger value guides the particle towards 
+	it's best position found previously.*/
 	const float c1 = 2.0f;
-	/* Social coefficient. */
+	/* Social coefficient. Bigger value guides the particle towards 
+	swarm's best position. */
 	const float c2 = 2.0f;
-	/* Inertia coefficient. */
+	/* Inertia coefficient. Bigger value makes the particle want 
+	to stay nearer to previous position. */
 	const float w = 1.0f;
 	/* Maximum velocity along any coordinate axis. */
 	const float maxVel = 3.0f;
