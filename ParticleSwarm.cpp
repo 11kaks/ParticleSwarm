@@ -11,13 +11,14 @@
 
 
 static void test(OP &op) {
-	std::vector<std::vector<float>> range = op.getSearchRange();
-	
+	std::vector<std::vector<float>> range = op.getSearchRange();	
+	std::cout << "Search range:" << std::endl;
+
 	for(int i = 0; i < range.size(); i++) {
-		for(int j = 0; j < range.size(); j++) {
-			std::cout << "index " << i << j << " = " << range[i][j] << std::endl;
-		}
+		std::cout << range[i][0]  << " <= " << "x" << i+1 << " <= " << range[i][1] << std::endl;		
 	}
+	std::vector<float> point = { 0.0f,0.0f };
+	std::cout << "f(" << point[0] << "," << point[1] << ") = " << op.evaluate(point) << std::endl;
 }
 
 int main()
