@@ -4,13 +4,14 @@
 #include "pch.h"
 #include "OP.h"
 #include "Rastriging.h"
+#include "Particle.h"
 
 #include <iostream>
 #include <vector>
 
 
 
-static void test(OP &op) {
+static void testRastriging(OP &op) {
 	std::vector<std::vector<float>> range = op.getSearchRange();	
 	std::cout << "Search range:" << std::endl;
 
@@ -21,19 +22,15 @@ static void test(OP &op) {
 	std::cout << "f(" << point[0] << "," << point[1] << ") = " << op.evaluate(point) << std::endl;
 }
 
+static void testParticle(OP &op) {
+	std::vector<float> x = { 0.f,0.f };
+	std::vector<float> v = { 0.2f,0.1f };
+	Particle part(x, v, op);
+	part.print();
+}
+
 int main()
 {
 	Rastriging problem;
-	test(problem);
+	testParticle(problem);
 }
-
-// Run program: Ctrl + F5 or Debug > Start Without Debugging menu
-// Debug program: F5 or Debug > Start Debugging menu
-
-// Tips for Getting Started: 
-//   1. Use the Solution Explorer window to add/manage files
-//   2. Use the Team Explorer window to connect to source control
-//   3. Use the Output window to see build output and other messages
-//   4. Use the Error List window to view errors
-//   5. Go to Project > Add New Item to create new code files, or Project > Add Existing Item to add existing code files to the project
-//   6. In the future, to open this project again, go to File > Open > Project and select the .sln file
