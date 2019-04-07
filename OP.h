@@ -65,7 +65,7 @@ public:
 	 */
 	float evaluate(std::vector<float> &point);
 
-private:
+protected:
 	/* Decision space dimension. */
 	int decDim;
 	/* Objective space dimension. */

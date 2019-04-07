@@ -5,6 +5,7 @@
 #include "OP.h"
 #include "Rastriging.h"
 #include "Particle.h"
+#include "Swarm.h"
 
 #include <iostream>
 #include <vector>
@@ -45,8 +46,22 @@ static void testParticle(OP &op) {
 	part.print();
 }
 
+static void testSwarm(OP &op) {
+	Swarm swarm(20, op);
+	int gens = 10000;
+
+	std::cout << "First gen:" << std::endl;
+	swarm.print();
+
+	for(int i = 0; i < gens; ++i) {
+		swarm.updateParticlePositions();
+	}
+	std::cout << "Last gen:" << std::endl;
+	swarm.print();
+}
+
 int main()
 {
 	Rastriging problem;
-	testParticle(problem);
+	testSwarm(problem);
 }

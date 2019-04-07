@@ -6,6 +6,7 @@
 
 
 Rastriging::Rastriging() {
+	decDim = 2;
 }
 
 

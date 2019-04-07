@@ -27,8 +27,5 @@ public:
 
 	float evaluatePenalty(std::vector<float> &point);
 
-private:
-	int objDim = 1;
-	int decDim = 2;
 };
 

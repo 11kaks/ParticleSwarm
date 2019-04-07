@@ -56,15 +56,15 @@ public:
 private:
 	/* Cognitive coefficient. Bigger value guides the particle towards 
 	it's best position found previously.*/
-	const float c1 = 2.0f;
+	const float c1 = 0.3f;
 	/* Social coefficient. Bigger value guides the particle towards 
 	swarm's best position. */
-	const float c2 = 2.0f;
+	const float c2 = 0.3f;
 	/* Inertia coefficient. Bigger value makes the particle want 
 	to stay nearer to previous position. */
-	const float w = 1.0f;
+	const float w = 0.4f;
 	/* Maximum velocity along any coordinate axis. */
-	const float maxVel = 3.0f;
+	const float maxVel = 1.0f;
 
 	/**
 	  Update velocity clamped to maxVel in any axis.
