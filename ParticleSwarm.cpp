@@ -27,6 +27,17 @@ static void testParticle(OP &op) {
 	std::vector<float> v = { 0.2f,0.1f };
 	Particle part(x, v, op);
 	part.print();
+	int maxRounds = 2000;
+	int printEvery = 100;
+	std::vector<float> dir = { 0.f,0.f };
+	for(int i = 0; i < maxRounds; i++) {
+		part.update(dir);
+		if(i % printEvery == 0) {
+			part.print();
+		}
+	}
+
+	part.print();
 }
 
 int main()
