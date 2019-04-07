@@ -41,71 +41,19 @@ public:
 	~Particle();
 
 	/**
-	 * Update particle's position and velociy.
-	 *
-	 * @param towards Best local or global position towards which the particle
-	 *                should accelerate.
-	 * @param rnd     Random number generator.
+	  Update particle's position and velociy.
+
+	  @param direction Best local or global position towards which the particle
+					 should accelerate.
 	 */
-	void update(std::vector<float> direction) {
-		updateVelocity(direction);
-		updatePosition();
-		updateFuncValue();
-	}
+	void update(std::vector<float> direction);
+
+
 
 	/**
-	 * Update velocity clamped to maxVel in any axis.
-	 */
-	void updateVelocity(std::vector<float> direction) {
-		vOld = v;
-		for(int i = 0; i < x.size(); i++) {
-			v[i] = w * vOld[i] + c1 * rnd01() * (xBest[i] - x[i]) + c2 * rnd01() * (direction[i] - x[i]);
-			if(v[i] > maxVel) {
-				v[i] = maxVel;
-			} else if(v[i] < -maxVel) {
-				v[i] = -maxVel;
-			}
-		}
-	}
-
-	/**
-	 * Update particle to a new position based on current velocity.
-	 * The velocity must be calculated before calling this.
-	 */
-	void updatePosition() {
-		xOld = x;
-		for(int i = 0; i < x.size(); i++) {
-			x[i] = xOld[i] + v[i];
-		}
-	}
-
-	/**
-	 * Update function value and set best if needed.
-	 *
-	 * This is the hard coded minimization problem, which takes into account
-	 * the lower and upper bounds through a penalty function.
-	 */
-	void updateFuncValue() {
-		fVal = op.evaluate(x);
-		if(fVal < valBest) {
-			valBest = fVal;
-			xBest = x;
-		}
-	}
-
-	/**
-	Random number in range [0,1[
+	Print something to standard stream. 
 	*/
-	float rnd01() {
-		return rand() / (RAND_MAX + 1.f);
-	}
-
-	/*Print something to standard stream. */
-	void print() {
-		std::cout << "Curr pos (" << x[0] << "," << x[1] << ")" << std::endl;
-		std::cout << "Curr vel (" << v[0] << "," << v[1] << ")" << std::endl;
-		std::cout << "Curr val " << op.evaluate(x) << std::endl;
-	}
+	void print();
 
 private:
 	/* Cognitive coefficient. */
@@ -117,5 +65,25 @@ private:
 	/* Maximum velocity along any coordinate axis. */
 	const float maxVel = 3.0f;
 
+	/**
+	  Update velocity clamped to maxVel in any axis.
+	 */
+	void updateVelocity(std::vector<float> direction);
+
+	/**
+	  Update particle to a new position based on current velocity.
+	  The new velocity must be calculated before calling this.
+	 */
+	void updatePosition();
+
+	/**
+	  Update function value and set best x and fVal if needed.
+	 */
+	void updateFuncValue();
+
+	/**
+	Random number in range [0,1[
+	*/
+	float rnd01();
 };
 
