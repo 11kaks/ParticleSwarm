@@ -1,6 +1,6 @@
 CC = g++
 CFLAGS = -c
-SOURCES =  ParticleSwarm.cpp OP.cpp Rastriging.cpp Particle.cpp
+SOURCES =  ParticleSwarm.cpp OP.cpp Rastriging.cpp Particle.cpp Swarm.cpp
 OBJECTS = $(SOURCES:.cpp=.o)
 EXECUTABLE = ParticleSwarm
 
