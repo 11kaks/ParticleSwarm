@@ -48,19 +48,34 @@ static void testParticle(OP &op) {
 
 static void testSwarm(OP &op) {
 	XM xm;
-	Swarm swarm(20, op);
-	int gens = 100;
+	// TODO: Create particles based on warp size?
+	int amountParticles = 20;
+	Swarm swarm(amountParticles, op);
+	int generations = 1000;
 
-	std::cout << "First gen:" << std::endl;
+	std::cout << "First generation:" << std::endl;
 	swarm.print();
+
 	xm.startSwarm(std::chrono::high_resolution_clock::now());
-	for(int i = 0; i < gens; ++i) {
+	for(int i = 0; i < generations; ++i) {
 		swarm.updateParticlePositions();
 	}
 	xm.endSwarm(std::chrono::high_resolution_clock::now());
-	std::cout << "Last gen:" << std::endl;
-	std::cout << "Running the swarm took: " << xm.swarmDuration << " s." << std::endl;
+	swarm.end();
+
+	std::cout << "Last generation:" << std::endl;
 	swarm.print();
+
+	std::cout << "Running the swarm took: " << xm.swarmDuration << " s." << std::endl;
+	std::cout << "of which " << std::endl;
+	std::cout << "initialization      " << swarm.initTimeMicS << " micro seconds." << std::endl;
+	std::cout << "updating best value " << swarm.updateBestTimeMicS << " micro seconds." << std::endl;
+	std::cout << "updating particles  " << swarm.updateParticlesTimeMicS << " micro seconds." << std::endl;
+	std::cout << "of which" << std::endl;
+	std::cout << "updating positions       " << swarm.updatePosTimeMicS << " micro seconds." << std::endl;
+	std::cout << "updating velocities      " << swarm.updateVelTimeMicS << " micro seconds." << std::endl;
+	std::cout << "updating function values " << swarm.updateFunTimeMicS << " micro seconds." << std::endl;
+	std::cout << "Total function evaluations " << swarm.fEvals << std::endl;
 }
 
 int main()

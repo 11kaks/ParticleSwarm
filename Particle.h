@@ -29,6 +29,13 @@ public:
 	/* Optimization problem. */
 	OP &op;
 
+	// Execution metrics
+	int fEvals = 0;
+
+	int updateVelTimeMicS = 0;
+	int updatePosTimeMicS = 0;
+	int updateFunTimeMicS = 0;
+
 	/**
 	Create a new particle.
 

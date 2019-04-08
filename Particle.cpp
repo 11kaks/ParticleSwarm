@@ -4,6 +4,7 @@
 #include <iostream>
 #include <vector>
 #include <stdlib.h> 
+#include <chrono>
 
 Particle::Particle(std::vector<float> initialX, std::vector<float> initialV, OP &problem) :
 	x(initialX),
@@ -28,6 +29,8 @@ void Particle::update(std::vector<float> direction) {
 }
 
 void Particle::updateVelocity(std::vector<float> direction) {
+	std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
+
 	vOld = v;
 	for(int i = 0; i < x.size(); i++) {
 		v[i] = w * vOld[i] + c1 * rnd01() * (xBest[i] - x[i]) + c2 * rnd01() * (direction[i] - x[i]);
@@ -37,21 +40,34 @@ void Particle::updateVelocity(std::vector<float> direction) {
 			v[i] = -maxVel;
 		}
 	}
+	std::chrono::high_resolution_clock::time_point end = std::chrono::high_resolution_clock::now();
+	updateVelTimeMicS += std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
 }
 
 void Particle::updatePosition() {
+	std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
 	xOld = x;
 	for(int i = 0; i < x.size(); i++) {
 		x[i] = xOld[i] + v[i];
 	}
+	std::chrono::high_resolution_clock::time_point end = std::chrono::high_resolution_clock::now();
+	updatePosTimeMicS += std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
 }
 
 void Particle::updateFuncValue() {
+	std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
+	// If penaltys are included, call to op.evaluate() will cause
+	// more than one function evaluation, so this is not actually 
+	// correct.
 	fVal = op.evaluate(x);
+	fEvals++;
+
 	if(fVal < valBest) {
 		valBest = fVal;
 		xBest = x;
 	}
+	std::chrono::high_resolution_clock::time_point end = std::chrono::high_resolution_clock::now();
+	updateFunTimeMicS += std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
 }
 
 float Particle::rnd01() {
