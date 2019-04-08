@@ -12,11 +12,6 @@ Particle::Particle(std::vector<float> initialX, std::vector<float> initialV, OP 
 {
 	fVal = problem.evaluate(initialX);
 	valBest = fVal;
-	
-	 /* initialize random 
-	 TODO: different seed for every particle
-	 */
-	srand(11354);
 }
 
 

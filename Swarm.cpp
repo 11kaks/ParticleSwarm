@@ -8,7 +8,6 @@
 
 Swarm::Swarm(std::size_t size, OP &problem) :
 	op(problem) {
-	srand(145623);
 	particles.resize(size);
 	std::vector<std::vector<float>> range = problem.getSearchRange();
 
@@ -17,12 +16,9 @@ Swarm::Swarm(std::size_t size, OP &problem) :
 	std::vector<float> v(x.size());
 	for(int k = 0; k < size; k++) {
 		for(int i = 0; i < x.size(); ++i) {
-			// TODO: Rand keeps oscillating between two numbers why?????
 			float a = range[i][0];
 			float b = range[i][1];
-			float diff = b - a;
-			int r = rand();
-			float randval = a + (r / (RAND_MAX / diff));
+			float randval = randMToN(a, b);
 			x[i] = randval;
 			v[i] = 0.f;
 		}

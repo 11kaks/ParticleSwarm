@@ -62,7 +62,7 @@ private:
 	const float c2 = 0.3f;
 	/* Inertia coefficient. Bigger value makes the particle want 
 	to stay nearer to previous position. */
-	const float w = 0.4f;
+	const float w = 0.8f;
 	/* Maximum velocity along any coordinate axis. */
 	const float maxVel = 1.0f;
 

@@ -11,7 +11,6 @@
 #include <vector>
 
 
-
 static void testRastriging(OP &op) {
 	std::vector<std::vector<float>> range = op.getSearchRange();	
 	std::cout << "Search range:" << std::endl;
@@ -48,7 +47,7 @@ static void testParticle(OP &op) {
 
 static void testSwarm(OP &op) {
 	Swarm swarm(20, op);
-	int gens = 10000;
+	int gens = 1000;
 
 	std::cout << "First gen:" << std::endl;
 	swarm.print();
@@ -62,6 +61,7 @@ static void testSwarm(OP &op) {
 
 int main()
 {
+	srand(145623);
 	Rastriging problem;
 	testSwarm(problem);
 }
