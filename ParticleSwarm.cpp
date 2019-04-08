@@ -49,7 +49,7 @@ static void testParticle(OP &op) {
 static void testSwarm(OP &op) {
 	XM xm;
 	Swarm swarm(20, op);
-	int gens = 10000;
+	int gens = 100;
 
 	std::cout << "First gen:" << std::endl;
 	swarm.print();
