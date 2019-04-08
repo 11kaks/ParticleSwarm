@@ -6,6 +6,7 @@
 #include "Rastriging.h"
 #include "Particle.h"
 #include "Swarm.h"
+#include "XM.h"
 
 #include <iostream>
 #include <vector>
@@ -46,16 +47,19 @@ static void testParticle(OP &op) {
 }
 
 static void testSwarm(OP &op) {
+	XM xm;
 	Swarm swarm(20, op);
-	int gens = 1000;
+	int gens = 10000;
 
 	std::cout << "First gen:" << std::endl;
 	swarm.print();
-
+	xm.startSwarm(std::chrono::high_resolution_clock::now());
 	for(int i = 0; i < gens; ++i) {
 		swarm.updateParticlePositions();
 	}
+	xm.endSwarm(std::chrono::high_resolution_clock::now());
 	std::cout << "Last gen:" << std::endl;
+	std::cout << "Running the swarm took: " << xm.swarmDuration << " s." << std::endl;
 	swarm.print();
 }
 
