@@ -1,6 +1,9 @@
 #include "pch.h"
 #include "Particle.h"
 
+#include <iostream>
+#include <vector>
+#include <stdlib.h> 
 
 Particle::Particle(std::vector<float> initialX, std::vector<float> initialV, OP &problem) :
 	x(initialX),

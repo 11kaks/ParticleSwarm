@@ -20,32 +20,20 @@ public:
 	Swarm(std::size_t size, OP &problem);
 	~Swarm();
 
-	void print() {
-		for(Particle *p : particles) {
-			p->print();
-		}
-		std::vector<float> x = particles.at(bestParticleIdx)->x;
-		float best = particles.at(bestParticleIdx)->fVal;
-		std::cout << "Swarm's best f(" << x[0] << "," << x[1] << ") = " << best << std::endl;
-		std::cout << "---------------------------------------------" << std::endl;
-	}
+	/**
+	Print best value of the swarm.
+	*/
+	void print();
+
+	/**
+	Print particles of the swarm.
+	*/
+	void printParticles();
 
 	/**
 	 * Update all particles in the list using global or local paradigm.
 	 */
-	void updateParticlePositions() {
-		//if(useGlobal) {
-		for(Particle *p : particles) {
-			p->update(particles.at(bestParticleIdx)->x);
-		}
-		//} 
-		/*else {
-			for(int i = 0; i < particles.size(); i++) {
-				particles.get(i).update(particles.get(localBestIdx(i, 2)).getX());
-			}
-		}*/
-		updateBest();
-	}
+	void updateParticlePositions();
 
 
 private:
@@ -56,21 +44,14 @@ private:
 
 
 	/**
-	* Update current generation's best value.
+	* Update current generation's best value to the swarm.
 	*/
-	void updateBest() {
-		for(int i = 0; i < particles.size(); i++) {
-			float val = particles.at(i)->fVal;
-			if(val < bestVal) {
-				bestParticleIdx = i;
-				bestVal = val;
-			}
-		}
-	}
+	void updateBest();
 
-	float randMToN(float M, float N) {
-		return M + (rand() / (RAND_MAX / (N - M)));
-	}
+	/**
+	Random number between M and N.
+	*/
+	float randMToN(float M, float N);
 
 };
 
