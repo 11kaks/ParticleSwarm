@@ -1,6 +1,7 @@
 #pragma once
 
 #include <vector>
+#include <string>
 
 #define PI 3.14159265
 
@@ -12,6 +13,8 @@ class OP
 public:
 	OP() {};
 	~OP() {};
+
+	std::string name;
 
 	/**
 	  Search range of the problem. Used to generate initial random 

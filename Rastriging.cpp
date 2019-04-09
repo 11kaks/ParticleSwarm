@@ -7,6 +7,7 @@
 
 Rastriging::Rastriging() {
 	decDim = 2;
+	name = "Rastriging";
 }
 
 
