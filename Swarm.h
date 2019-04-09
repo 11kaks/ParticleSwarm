@@ -6,6 +6,10 @@
 
 #include "Particle.h"
 
+
+#include "cuda_runtime.h"
+#include "device_launch_parameters.h"
+
 class Swarm
 {
 public:
@@ -42,7 +46,8 @@ public:
 	/**
 	 * Update all particles in the list using global or local paradigm.
 	 */
-	void updateParticlePositions();
+	__host__ void updateParticlePositions();
+
 
 	/**
 	Update execution times from particles.
@@ -67,7 +72,7 @@ private:
 	/**
 	* Update current generation's best value to the swarm.
 	*/
-	void updateBest();
+	__host__ void updateBest();
 
 	/**
 	Random number between M and N.

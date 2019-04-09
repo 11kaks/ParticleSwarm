@@ -1,7 +1,6 @@
 // ParticleSwarm.cpp : This file contains the 'main' function. Program execution begins and ends there.
 //
 
-#include "pch.h"
 #include "OP.h"
 #include "Rastriging.h"
 #include "Particle.h"
@@ -60,20 +59,30 @@ static void testParticle(OP &op) {
 	part.print();
 }
 
+
 static void testSwarm(OP &op) {
+	bool useCuda = true;
 	XM xm;
 	// TODO: Create particles based on warp size?
 	int size = 20;
 	Swarm swarm(size, op);
-	int generations = 100;
+	int generations = 1000;
 
 	std::cout << "First generation:" << std::endl;
 	swarm.print();
 
+
 	xm.startSwarm(std::chrono::high_resolution_clock::now());
+	//if(useCuda){
 	for(int i = 0; i < generations; ++i) {
+		//swarm.updateParticlePositions<<<1,1>>>();
 		swarm.updateParticlePositions();
+		// Wait for GPU to finish before accessing on host
+		cudaDeviceSynchronize();
 	}
+	/*} else {
+		swarm.updateParticlePositions();
+	}*/
 	xm.endSwarm(std::chrono::high_resolution_clock::now());
 	swarm.end();
 

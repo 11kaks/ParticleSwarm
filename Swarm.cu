@@ -1,4 +1,3 @@
-#include "pch.h"
 #include "Swarm.h"
 #include "Particle.h"
 
@@ -6,6 +5,10 @@
 #include <vector>
 #include <stdlib.h>
 #include <chrono>
+
+
+#include "cuda_runtime.h"
+#include "device_launch_parameters.h"
 
 
 Swarm::Swarm(std::size_t size, OP &problem) :
@@ -43,9 +46,34 @@ Swarm::~Swarm() {
 	}
 }
 
-void Swarm::updateParticlePositions() {
+__global__ void updateParticlePositionsCUDA() {
+
+}
+
+
+__host__ void Swarm::updateParticlePositions() {
 
 	std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
+	cudaError_t cudaStatus;
+
+	// pointer to particles vector
+	std::vector<Particle*> * pParticles = &particles;
+	std::vector<Particle*> * tempParticles = &pParticles[0];
+	
+	cudaStatus = cudaMalloc((void**)&tempParticles, pParticles->size() * sizeof(Particle));
+	if(cudaStatus != cudaSuccess) {
+		fprintf(stderr, "cudaMalloc failed!");
+		goto Error;
+	}
+
+	// FIXME: tähän kaatuu read access violation
+	/*cudaStatus = cudaMemcpy(tempParticles, pParticles, pParticles->size() * sizeof(Particle), cudaMemcpyHostToDevice);
+	if(cudaStatus != cudaSuccess) {
+		fprintf(stderr, "cudaMemcpy failed!");
+		goto Error;
+	} else {
+		fprintf(stderr, "cudaMalloc success!");
+	}*/
 
 	// Guide all particles towards the current best position.
 	Particle *best= particles.at(bestParticleIdx);
@@ -59,9 +87,14 @@ void Swarm::updateParticlePositions() {
 	updateParticlesTimeMicS += std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
 
 	updateBest();
+
+Error:
+	cudaFree(tempParticles);
+
+	return;
 }
 
-void Swarm::updateBest() {
+__host__ void Swarm::updateBest() {
 	// TODO: can this be parallelized?
 	// Anyways, need to wait for all particles to be updated.
 
