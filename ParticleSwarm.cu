@@ -49,12 +49,12 @@ static void testParticle(OP &op) {
 	// Guide the particle towards origin at all times
 	std::vector<float> dir = { 0.f,0.f };
 
-	for(int i = 0; i < maxRounds; i++) {
+	/*for(int i = 0; i < maxRounds; i++) {
 		part.update(dir);
 		if(i % printEvery == 0) {
 			part.print();
 		}
-	}
+	}*/
 
 	part.print();
 }
@@ -64,8 +64,9 @@ static void testSwarm(OP &op) {
 	bool useCuda = true;
 	XM xm;
 	// TODO: Create particles based on warp size?
-	int size = 20;
-	Swarm swarm(size, op);
+	const int size = 20;
+	const int dim = 2; // OP decision space dimension
+	Swarm swarm(size, dim, op);
 	int generations = 1000;
 
 	std::cout << "First generation:" << std::endl;
@@ -75,8 +76,16 @@ static void testSwarm(OP &op) {
 	xm.startSwarm(std::chrono::high_resolution_clock::now());
 	//if(useCuda){
 	for(int i = 0; i < generations; ++i) {
+		cudaError_t cudaStatus = cudaGetLastError();
+		if(cudaStatus != cudaSuccess) {
+			fprintf(stderr, "PS before update failed: %s\n", cudaGetErrorString(cudaStatus));
+		}
 		//swarm.updateParticlePositions<<<1,1>>>();
 		swarm.updateParticlePositions();
+		cudaStatus = cudaGetLastError();
+		if(cudaStatus != cudaSuccess) {
+			fprintf(stderr, "PS after update failed: %s\n", cudaGetErrorString(cudaStatus));
+		}
 		// Wait for GPU to finish before accessing on host
 		cudaDeviceSynchronize();
 	}
@@ -85,6 +94,13 @@ static void testSwarm(OP &op) {
 	}*/
 	xm.endSwarm(std::chrono::high_resolution_clock::now());
 	swarm.end();
+
+
+	for(int i = 0; i < size; i++) {
+		for(size_t j = 1; j < dim; ++j) {
+			std::cout << "(" << swarm.xx[i*j - 1 + j] << "," << swarm.xx[i*j + j] << ")" << std::endl;
+		}
+	}
 
 	std::cout << "Last generation:" << std::endl;
 	swarm.print();

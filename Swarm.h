@@ -16,6 +16,11 @@ public:
 
 	std::vector<Particle*> particles;
 
+	float *xx;
+
+	const size_t decDim;
+	const size_t size;
+
 	int initTimeMicS = 0;
 	int updateBestTimeMicS = 0;
 	int updateParticlesTimeMicS = 0;
@@ -30,7 +35,7 @@ public:
 
 	int fEvals = 0;
 
-	Swarm(std::size_t size, OP &problem);
+	Swarm(std::size_t size, const std::size_t dim, OP &problem);
 	~Swarm();
 
 	/**
@@ -47,6 +52,8 @@ public:
 	 * Update all particles in the list using global or local paradigm.
 	 */
 	__host__ void updateParticlePositions();
+
+	void posToList();
 
 
 	/**
