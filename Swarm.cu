@@ -20,6 +20,7 @@ Swarm::Swarm(const std::size_t size, const std::size_t dim, OP &problem) :
 	xx = new float[size*dim];
 	xb = new float[size*dim];
 	vv = new float[size*dim];
+	xbg = new float[dim];
 
 	particles.resize(size);
 	std::vector<std::vector<float>> range = problem.getSearchRange();
@@ -60,6 +61,7 @@ Swarm::~Swarm() {
 	}
 	delete[] xx;
 	delete[] xb;
+	delete[] xbg;
 	delete[] vv;
 
 }
@@ -94,24 +96,35 @@ void Swarm::arraysToParticles() {
 #define C2 0.3
 #define W 0.8
 
-__global__ void updateParticlePositionsKernel(float *vel, float *pos, float *best, size_t pitch, size_t size, size_t dim) {
+#define CUDA_CALL(x) do { if((x)!=cudaSuccess) { \
+    printf("Error at %s:%d\n",__FILE__,__LINE__);\
+    return EXIT_FAILURE;}} while(0)
+#define CURAND_CALL(x) do { if((x)!=CURAND_STATUS_SUCCESS) { \
+    printf("Error at %s:%d\n",__FILE__,__LINE__);\
+    return EXIT_FAILURE;}} while(0)
+
+__global__ void updateParticleVelocityKernel(float *vel, float *pos, float *best, float *gb, size_t pitch, size_t size, size_t dim) {
 
 	int tidx = blockIdx.x*blockDim.x + threadIdx.x;
 	int tidy = blockIdx.y*blockDim.y + threadIdx.y;
 
 	if((tidx < dim) && (tidy < size)) {
 		float *posRow = (float *)((char*)pos + tidy * pitch);
-		posRow[tidx] = 15.f;
+		//posRow[tidx] = 15.f;
 		float *bestRow = (float *)((char*)best + tidy * pitch);
-		bestRow[tidx] = 1.f;
+		//bestRow[tidx] = 1.f;
+		float *gbRow = (float *)((char*)best + 1 * pitch);
+		//gbRow[tidx] = 1.f;
 		float *velRow = (float *)((char*)vel + tidy * pitch);
-		velRow[tidx] = 0.5f;
+		//velRow[tidx] = 0.5f;
 
 		//
 		//v[i] = w * vOld[i] + c1 * rnd01() * (xBest[i] - x[i]) + c2 * rnd01() * (direction[i] - x[i]);
 		// placeholder for a random number
-		//float rnd = 0.1;
-		//velRow[tidx] = W * velRow[tidx] + C1 * rnd * (best[tidx] - posRow[tidx]) + C2 * rnd * (direction[i] - posRow[tidx]);
+		float rnd = 1.1;
+		velRow[tidx] = W * velRow[tidx] + C1 * rnd * (bestRow[tidx] - posRow[tidx]) + C2 * rnd * (gbRow[tidx] - posRow[tidx]);
+		// update position
+		posRow[tidx] = posRow[tidx] + velRow[tidx];
 		//
 	}
 }
@@ -127,12 +140,13 @@ __host__ void Swarm::updateParticlePositions(bool CUDAposvel) {
 
 		float * devxx;
 		float * devxb;
+		float * devxbg;
 		float * devvv;
 		size_t pitch;
 		size_t sSize = (size_t)size;
 
 		// Guide all particles towards the current best position.
-		Particle *best = particles.at(bestParticleIdx);
+		//Particle *best = particles.at(bestParticleIdx);
 
 		cudaStatus = cudaGetLastError();
 		if(cudaStatus != cudaSuccess) {
@@ -146,6 +160,12 @@ __host__ void Swarm::updateParticlePositions(bool CUDAposvel) {
 		}
 		// Allocate device best position array
 		cudaStatus = cudaMallocPitch(&devxb, &pitch, decDim * sizeof(float), sSize);
+		if(cudaStatus != cudaSuccess) {
+			fprintf(stderr, "cudaMallocPitch position failed!");
+			goto Error;
+		}
+		// Allocate device global best position 
+		cudaStatus = cudaMallocPitch(&devxbg, &pitch, decDim * sizeof(float), 1);
 		if(cudaStatus != cudaSuccess) {
 			fprintf(stderr, "cudaMallocPitch position failed!");
 			goto Error;
@@ -174,6 +194,12 @@ __host__ void Swarm::updateParticlePositions(bool CUDAposvel) {
 			fprintf(stderr, "cudaMemcpy failed!");
 			goto Error;
 		}
+		// Copy global best position to device
+		cudaStatus = cudaMemcpy2D(devxbg, pitch, xbg, decDim * sizeof(float), decDim * sizeof(float), 1, cudaMemcpyHostToDevice);
+		if(cudaStatus != cudaSuccess) {
+			fprintf(stderr, "cudaMemcpy failed!");
+			goto Error;
+		}
 		// Copy velocities to device array
 		cudaStatus = cudaMemcpy2D(devvv, pitch, vv, decDim * sizeof(float), decDim * sizeof(float), size, cudaMemcpyHostToDevice);
 		if(cudaStatus != cudaSuccess) {
@@ -198,7 +224,7 @@ __host__ void Swarm::updateParticlePositions(bool CUDAposvel) {
 		}
 
 		// Kernel call
-		updateParticlePositionsKernel << <gridSize, blockSize >> > (devvv, devxx, devxb, pitch, size, decDim);
+		updateParticleVelocityKernel << <gridSize, blockSize >> > (devvv, devxx, devxb, devxbg, pitch, size, decDim);
 
 		// Check for any errors launching the kernel
 		cudaStatus = cudaGetLastError();
@@ -215,7 +241,6 @@ __host__ void Swarm::updateParticlePositions(bool CUDAposvel) {
 			goto Error;
 		}
 
-
 		// Copy position array from GPU buffer to host memory.
 		cudaStatus = cudaMemcpy2D(xx, decDim * sizeof(float), devxx, pitch, decDim * sizeof(float), size, cudaMemcpyDeviceToHost);
 		if(cudaStatus != cudaSuccess) {
@@ -224,6 +249,12 @@ __host__ void Swarm::updateParticlePositions(bool CUDAposvel) {
 		}
 		// Copy best position array from GPU buffer to host memory.
 		cudaStatus = cudaMemcpy2D(xb, decDim * sizeof(float), devxb, pitch, decDim * sizeof(float), size, cudaMemcpyDeviceToHost);
+		if(cudaStatus != cudaSuccess) {
+			fprintf(stderr, "cudaMemcpy back to host failed!");
+			goto Error;
+		}
+		// Copy global best position from GPU buffer to host memory.
+		cudaStatus = cudaMemcpy2D(xbg, decDim * sizeof(float), devxbg, pitch, decDim * sizeof(float), 1, cudaMemcpyDeviceToHost);
 		if(cudaStatus != cudaSuccess) {
 			fprintf(stderr, "cudaMemcpy back to host failed!");
 			goto Error;
@@ -247,6 +278,8 @@ __host__ void Swarm::updateParticlePositions(bool CUDAposvel) {
 		std::chrono::high_resolution_clock::time_point end = std::chrono::high_resolution_clock::now();
 		updateParticlesTimeMicS += std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
 
+		updateBest();
+
 		return;
 
 	// Without CUDA
@@ -266,9 +299,10 @@ __host__ void Swarm::updateParticlePositions(bool CUDAposvel) {
 
 		std::chrono::high_resolution_clock::time_point end = std::chrono::high_resolution_clock::now();
 		updateParticlesTimeMicS += std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+
+		updateBest();
 	}
 
-	updateBest();
 
 }
 
@@ -287,6 +321,15 @@ __host__ void Swarm::updateBest() {
 			bestVal = val;
 		}
 	}
+
+	// This update is for CUDA kernel methods.
+	Particle *bestParticle = particles[bestParticleIdx];
+	for(size_t i = 0; i < decDim; ++i) {
+		xbg[i] = bestParticle->x[i];
+	}
+
+	//std::cout << "update best (" << xbg[0] << "," << xbg[1] <<")" << std::endl;
+
 	std::chrono::high_resolution_clock::time_point end = std::chrono::high_resolution_clock::now();
 	updateBestTimeMicS += std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
 }

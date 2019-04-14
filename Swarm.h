@@ -23,6 +23,9 @@ public:
 	float *vv;
 	/* Particle's best personal position. */
 	float *xb;
+	/* The global best position of the whole swarm. A single position, not a 
+	list of positions so it's a 1D array. */
+	float *xbg;
 
 	const size_t decDim;
 	const size_t size;
