@@ -18,10 +18,8 @@ Swarm::Swarm(const std::size_t size, const std::size_t dim, OP &problem) :
 	decDim(dim),
 	op(problem) {
 	xx = new float[size*dim];
+	xb = new float[size*dim];
 	vv = new float[size*dim];
-	/*for(int i = 0; i < size; ++i) {
-		xx[i] = new float[dim];
-	}*/
 
 	particles.resize(size);
 	std::vector<std::vector<float>> range = problem.getSearchRange();
@@ -61,7 +59,9 @@ Swarm::~Swarm() {
 		delete p;
 	}
 	delete[] xx;
+	delete[] xb;
 	delete[] vv;
+
 }
 
 int iDivUp(int hostPtr, int b) {
@@ -73,6 +73,7 @@ void Swarm::particlesToArrays() {
 		Particle *p = particles[i];
 		for(size_t j = 0; j < decDim; ++j) {
 			xx[i*j + j] = p->x[j];
+			xb[i*j + j] = p->xBest[j];
 			vv[i*j + j] = p->v[j];
 		}
 	}
@@ -83,13 +84,17 @@ void Swarm::arraysToParticles() {
 		Particle *p = particles[i];
 		for(size_t j = 0; j < decDim; ++j) {
 			p->x[j] = xx[i*j + j];
+			p->xBest[j] = xb[i*j + j];
 			p->v[j] = vv[i*j + j];
 		}
 	}
 }
 
+#define C1 0.3
+#define C2 0.3
+#define W 0.8
 
-__global__ void updateParticlePositionsKernel(float *vel, float *pos, size_t pitch, size_t size, size_t dim) {
+__global__ void updateParticlePositionsKernel(float *vel, float *pos, float *best, size_t pitch, size_t size, size_t dim) {
 
 	int tidx = blockIdx.x*blockDim.x + threadIdx.x;
 	int tidy = blockIdx.y*blockDim.y + threadIdx.y;
@@ -97,8 +102,17 @@ __global__ void updateParticlePositionsKernel(float *vel, float *pos, size_t pit
 	if((tidx < dim) && (tidy < size)) {
 		float *posRow = (float *)((char*)pos + tidy * pitch);
 		posRow[tidx] = 15.f;
+		float *bestRow = (float *)((char*)best + tidy * pitch);
+		bestRow[tidx] = 1.f;
 		float *velRow = (float *)((char*)vel + tidy * pitch);
 		velRow[tidx] = 0.5f;
+
+		//
+		//v[i] = w * vOld[i] + c1 * rnd01() * (xBest[i] - x[i]) + c2 * rnd01() * (direction[i] - x[i]);
+		// placeholder for a random number
+		//float rnd = 0.1;
+		//velRow[tidx] = W * velRow[tidx] + C1 * rnd * (best[tidx] - posRow[tidx]) + C2 * rnd * (direction[i] - posRow[tidx]);
+		//
 	}
 }
 
@@ -112,9 +126,13 @@ __host__ void Swarm::updateParticlePositions(bool CUDAposvel) {
 		cudaError_t cudaStatus;
 
 		float * devxx;
+		float * devxb;
 		float * devvv;
 		size_t pitch;
 		size_t sSize = (size_t)size;
+
+		// Guide all particles towards the current best position.
+		Particle *best = particles.at(bestParticleIdx);
 
 		cudaStatus = cudaGetLastError();
 		if(cudaStatus != cudaSuccess) {
@@ -122,6 +140,12 @@ __host__ void Swarm::updateParticlePositions(bool CUDAposvel) {
 		}
 		// Allocate device position array
 		cudaStatus = cudaMallocPitch(&devxx, &pitch, decDim * sizeof(float), sSize);
+		if(cudaStatus != cudaSuccess) {
+			fprintf(stderr, "cudaMallocPitch position failed!");
+			goto Error;
+		}
+		// Allocate device best position array
+		cudaStatus = cudaMallocPitch(&devxb, &pitch, decDim * sizeof(float), sSize);
 		if(cudaStatus != cudaSuccess) {
 			fprintf(stderr, "cudaMallocPitch position failed!");
 			goto Error;
@@ -144,6 +168,12 @@ __host__ void Swarm::updateParticlePositions(bool CUDAposvel) {
 			fprintf(stderr, "cudaMemcpy failed!");
 			goto Error;
 		}
+		// Copy best positions to device array
+		cudaStatus = cudaMemcpy2D(devxb, pitch, xb, decDim * sizeof(float), decDim * sizeof(float), size, cudaMemcpyHostToDevice);
+		if(cudaStatus != cudaSuccess) {
+			fprintf(stderr, "cudaMemcpy failed!");
+			goto Error;
+		}
 		// Copy velocities to device array
 		cudaStatus = cudaMemcpy2D(devvv, pitch, vv, decDim * sizeof(float), decDim * sizeof(float), size, cudaMemcpyHostToDevice);
 		if(cudaStatus != cudaSuccess) {
@@ -157,9 +187,6 @@ __host__ void Swarm::updateParticlePositions(bool CUDAposvel) {
 			goto Error;
 		}
 
-		// Guide all particles towards the current best position.
-		Particle *best = particles.at(bestParticleIdx);
-
 		dim3 gridSize(iDivUp(decDim, BLOCKSIZE_x), iDivUp(size, BLOCKSIZE_y));
 		dim3 blockSize(BLOCKSIZE_y, BLOCKSIZE_x);
 
@@ -171,7 +198,7 @@ __host__ void Swarm::updateParticlePositions(bool CUDAposvel) {
 		}
 
 		// Kernel call
-		updateParticlePositionsKernel << <gridSize, blockSize >> > (devvv, devxx, pitch, size, decDim);
+		updateParticlePositionsKernel << <gridSize, blockSize >> > (devvv, devxx, devxb, pitch, size, decDim);
 
 		// Check for any errors launching the kernel
 		cudaStatus = cudaGetLastError();
@@ -195,7 +222,12 @@ __host__ void Swarm::updateParticlePositions(bool CUDAposvel) {
 			fprintf(stderr, "cudaMemcpy back to host failed!");
 			goto Error;
 		}
-
+		// Copy best position array from GPU buffer to host memory.
+		cudaStatus = cudaMemcpy2D(xb, decDim * sizeof(float), devxb, pitch, decDim * sizeof(float), size, cudaMemcpyDeviceToHost);
+		if(cudaStatus != cudaSuccess) {
+			fprintf(stderr, "cudaMemcpy back to host failed!");
+			goto Error;
+		}
 		// Copy velocity array from GPU buffer to host memory.
 		cudaStatus = cudaMemcpy2D(vv, decDim * sizeof(float), devvv, pitch, decDim * sizeof(float), size, cudaMemcpyDeviceToHost);
 		if(cudaStatus != cudaSuccess) {
@@ -209,6 +241,7 @@ __host__ void Swarm::updateParticlePositions(bool CUDAposvel) {
 
 	Error:
 		cudaFree(devxx);
+		cudaFree(devxb);
 		cudaFree(devvv);
 
 		std::chrono::high_resolution_clock::time_point end = std::chrono::high_resolution_clock::now();

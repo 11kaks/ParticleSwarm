@@ -26,7 +26,7 @@ and it should build.
 
 static void testSwarm(OP &op) {
 	bool useCuda = true;
-	bool CUDAposvel = false;
+	bool CUDAposvel = true;
 	XM xm;
 	// TODO: Create particles based on warp size?
 	const int size = 20;
@@ -34,14 +34,22 @@ static void testSwarm(OP &op) {
 	Swarm swarm(size, dim, op);
 	int generations = 1000;
 
-	std::cout << "First generation:" << std::endl;
-	swarm.print();
+	
 
-	for(int i = 0; i < size; i++) {
-		for(size_t j = 1; j < dim; ++j) {
-			std::cout << "(" << swarm.xx[i*j - 1 + j] << "," << swarm.xx[i*j + j] << ") -> ("
-				<< swarm.vv[i*j - 1 + j] << "," << swarm.vv[i*j + j] << ")" << std::endl;
+	if(CUDAposvel) {
+		std::cout << "First generation:" << std::endl;
+		swarm.print();
+		for(int i = 0; i < size; i++) {
+			for(size_t j = 1; j < dim; ++j) {
+				std::cout << "(" << swarm.xx[i*j - 1 + j] << "," << swarm.xx[i*j + j] << ") -> ("
+					<< swarm.vv[i*j - 1 + j] << "," << swarm.vv[i*j + j] << ") B ("
+					<< swarm.xb[i*j - 1 + j] << "," << swarm.xb[i*j + j] << ")"
+					<< std::endl;
+			}
 		}
+	} else {
+		std::cout << "First generation:" << std::endl;
+		swarm.print();
 	}
 
 	xm.startSwarm(std::chrono::high_resolution_clock::now());
@@ -52,16 +60,22 @@ static void testSwarm(OP &op) {
 	xm.endSwarm(std::chrono::high_resolution_clock::now());
 	swarm.end();
 
-
-	for(int i = 0; i < size; i++) {
-		for(size_t j = 1; j < dim; ++j) {
-			std::cout << "(" << swarm.xx[i*j - 1 + j] << "," << swarm.xx[i*j + j] << ") -> (" 
-				<< swarm.vv[i*j - 1 + j] << "," << swarm.vv[i*j + j] << ")" << std::endl;
+	if(CUDAposvel) {
+		std::cout << "Last generation:" << std::endl;
+		swarm.print();
+		for(int i = 0; i < size; i++) {
+			for(size_t j = 1; j < dim; ++j) {
+				std::cout << "(" << swarm.xx[i*j - 1 + j] << "," << swarm.xx[i*j + j] << ") -> ("
+					<< swarm.vv[i*j - 1 + j] << "," << swarm.vv[i*j + j] << ") B ("
+					<< swarm.xb[i*j - 1 + j] << "," << swarm.xb[i*j + j] << ")"
+					<< std::endl;
+			}
 		}
+	} else {
+		std::cout << "Last generation:" << std::endl;
+		swarm.print();
 	}
 
-	std::cout << "Last generation:" << std::endl;
-	swarm.print();
 
 
 	std::cout << "-- " << op.name << " problem --" << std::endl;
@@ -80,9 +94,9 @@ static void testSwarm(OP &op) {
 	char sep = ';';
 	// Few words how this version is different from base version.
 	std::string upgrade = "Base";
-	std::cout 
-		<< std::fixed 
-		<< upgrade << sep 
+	std::cout
+		<< std::fixed
+		<< upgrade << sep
 		<< generations << sep
 		<< size << sep
 		<< xm.swarmDuration * 1000000 << sep
@@ -92,7 +106,7 @@ static void testSwarm(OP &op) {
 		<< swarm.updatePosTimeMicS << sep
 		<< swarm.updateVelTimeMicS << sep
 		<< swarm.updateFunTimeMicS << sep
-		<< swarm.fEvals 
+		<< swarm.fEvals
 		<< std::endl;
 }
 

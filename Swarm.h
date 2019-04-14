@@ -21,6 +21,8 @@ public:
 	/* Particle velocities as flattened 2D array. Particle i's velocity
 	along axis j is at index i*j + j.*/
 	float *vv;
+	/* Particle's best personal position. */
+	float *xb;
 
 	const size_t decDim;
 	const size_t size;
