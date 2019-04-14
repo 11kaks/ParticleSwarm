@@ -15,8 +15,12 @@ class Swarm
 public:
 
 	std::vector<Particle*> particles;
-
+	/* Particle positions as flattened 2D array. Particle i's position
+	along axis j is at index i*j + j.*/
 	float *xx;
+	/* Particle velocities as flattened 2D array. Particle i's velocity
+	along axis j is at index i*j + j.*/
+	float *vv;
 
 	const size_t decDim;
 	const size_t size;
@@ -53,7 +57,8 @@ public:
 	 */
 	__host__ void updateParticlePositions();
 
-	void posToList();
+	void particlesToArrays();
+	void arraysToParticles();
 
 
 	/**

@@ -72,6 +72,12 @@ static void testSwarm(OP &op) {
 	std::cout << "First generation:" << std::endl;
 	swarm.print();
 
+	for(int i = 0; i < size; i++) {
+		for(size_t j = 1; j < dim; ++j) {
+			std::cout << "(" << swarm.xx[i*j - 1 + j] << "," << swarm.xx[i*j + j] << ") -> ("
+				<< swarm.vv[i*j - 1 + j] << "," << swarm.vv[i*j + j] << ")" << std::endl;
+		}
+	}
 
 	xm.startSwarm(std::chrono::high_resolution_clock::now());
 	//if(useCuda){
@@ -98,7 +104,8 @@ static void testSwarm(OP &op) {
 
 	for(int i = 0; i < size; i++) {
 		for(size_t j = 1; j < dim; ++j) {
-			std::cout << "(" << swarm.xx[i*j - 1 + j] << "," << swarm.xx[i*j + j] << ")" << std::endl;
+			std::cout << "(" << swarm.xx[i*j - 1 + j] << "," << swarm.xx[i*j + j] << ") -> (" 
+				<< swarm.vv[i*j - 1 + j] << "," << swarm.vv[i*j + j] << ")" << std::endl;
 		}
 	}
 
