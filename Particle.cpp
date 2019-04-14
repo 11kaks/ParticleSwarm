@@ -21,11 +21,11 @@ Particle::Particle(std::vector<float> initialX, std::vector<float> initialV, OP 
 Particle::~Particle() {
 }
 
-void Particle::update(std::vector<float> direction) {
-	updateVelocity(direction);
-	updatePosition();
-	updateFuncValue();
-}
+//void Particle::update(std::vector<float> direction) {
+//	updateVelocity(direction);
+//	updatePosition();
+//	updateFuncValue();
+//}
 
 void Particle::updateVelocity(std::vector<float> direction) {
 	std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();

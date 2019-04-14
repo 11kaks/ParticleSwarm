@@ -105,127 +105,138 @@ __global__ void updateParticlePositionsKernel(float *vel, float *pos, size_t pit
 /*
 https://stackoverflow.com/questions/39006348/accessing-class-data-members-from-within-cuda-kernel-how-to-design-proper-host
 */
-__host__ void Swarm::updateParticlePositions() {
+__host__ void Swarm::updateParticlePositions(bool CUDAposvel) {
 
-	std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
-	cudaError_t cudaStatus;
+	if(CUDAposvel) {
+		std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
+		cudaError_t cudaStatus;
+
+		float * devxx;
+		float * devvv;
+		size_t pitch;
+		size_t sSize = (size_t)size;
+
+		cudaStatus = cudaGetLastError();
+		if(cudaStatus != cudaSuccess) {
+			fprintf(stderr, "before failed: %s\n", cudaGetErrorString(cudaStatus));
+		}
+		// Allocate device position array
+		cudaStatus = cudaMallocPitch(&devxx, &pitch, decDim * sizeof(float), sSize);
+		if(cudaStatus != cudaSuccess) {
+			fprintf(stderr, "cudaMallocPitch position failed!");
+			goto Error;
+		}
+		// Allocate device velocity array
+		cudaStatus = cudaMallocPitch(&devvv, &pitch, decDim * sizeof(float), sSize);
+		if(cudaStatus != cudaSuccess) {
+			fprintf(stderr, "cudaMallocPitch velocity failed!");
+			goto Error;
+		}
+
+		cudaStatus = cudaGetLastError();
+		if(cudaStatus != cudaSuccess) {
+			fprintf(stderr, "cudaMallocPitch failed: %s\n", cudaGetErrorString(cudaStatus));
+			goto Error;
+		}
+		// Copy positions to device array
+		cudaStatus = cudaMemcpy2D(devxx, pitch, xx, decDim * sizeof(float), decDim * sizeof(float), size, cudaMemcpyHostToDevice);
+		if(cudaStatus != cudaSuccess) {
+			fprintf(stderr, "cudaMemcpy failed!");
+			goto Error;
+		}
+		// Copy velocities to device array
+		cudaStatus = cudaMemcpy2D(devvv, pitch, vv, decDim * sizeof(float), decDim * sizeof(float), size, cudaMemcpyHostToDevice);
+		if(cudaStatus != cudaSuccess) {
+			fprintf(stderr, "cudaMemcpy failed!");
+			goto Error;
+		}
+
+		cudaStatus = cudaGetLastError();
+		if(cudaStatus != cudaSuccess) {
+			fprintf(stderr, "cudaMemcpy failed: %s\n", cudaGetErrorString(cudaStatus));
+			goto Error;
+		}
+
+		// Guide all particles towards the current best position.
+		Particle *best = particles.at(bestParticleIdx);
+
+		dim3 gridSize(iDivUp(decDim, BLOCKSIZE_x), iDivUp(size, BLOCKSIZE_y));
+		dim3 blockSize(BLOCKSIZE_y, BLOCKSIZE_x);
+
+		// Check for any errors launching the kernel
+		cudaStatus = cudaGetLastError();
+		if(cudaStatus != cudaSuccess) {
+			fprintf(stderr, "2  failed: %s\n", cudaGetErrorString(cudaStatus));
+			goto Error;
+		}
+
+		// Kernel call
+		updateParticlePositionsKernel << <gridSize, blockSize >> > (devvv, devxx, pitch, size, decDim);
+
+		// Check for any errors launching the kernel
+		cudaStatus = cudaGetLastError();
+		if(cudaStatus != cudaSuccess) {
+			fprintf(stderr, "updateParticlePositionsKernel launch failed: %s\n", cudaGetErrorString(cudaStatus));
+			goto Error;
+		}
+
+		// cudaDeviceSynchronize waits for the kernel to finish, and returns
+		// any errors encountered during the launch.
+		cudaStatus = cudaDeviceSynchronize();
+		if(cudaStatus != cudaSuccess) {
+			fprintf(stderr, "cudaDeviceSynchronize returned error code %d after launching updateParticlePositionsKernel!\n", cudaStatus);
+			goto Error;
+		}
 
 
+		// Copy position array from GPU buffer to host memory.
+		cudaStatus = cudaMemcpy2D(xx, decDim * sizeof(float), devxx, pitch, decDim * sizeof(float), size, cudaMemcpyDeviceToHost);
+		if(cudaStatus != cudaSuccess) {
+			fprintf(stderr, "cudaMemcpy back to host failed!");
+			goto Error;
+		}
 
-	// pointer to particles vector
-	//std::vector<Particle*> * pParticles = &particles;
-	//std::vector<Particle*> * tempParticles = &pParticles[0];
+		// Copy velocity array from GPU buffer to host memory.
+		cudaStatus = cudaMemcpy2D(vv, decDim * sizeof(float), devvv, pitch, decDim * sizeof(float), size, cudaMemcpyDeviceToHost);
+		if(cudaStatus != cudaSuccess) {
+			fprintf(stderr, "cudaMemcpy back to host failed!");
+			goto Error;
+		}
 
-	float * devxx;
-	float * devvv;
-	size_t pitch;
-	size_t sSize = (size_t)size;
+		/* The particles have to be updated after every time that there has been changes to
+		positions so that the function evaluation can be done on CPU-side.*/
+		arraysToParticles();
 
-	cudaStatus = cudaGetLastError();
-	if(cudaStatus != cudaSuccess) {
-		fprintf(stderr, "before failed: %s\n", cudaGetErrorString(cudaStatus));
+	Error:
+		cudaFree(devxx);
+		cudaFree(devvv);
+
+		std::chrono::high_resolution_clock::time_point end = std::chrono::high_resolution_clock::now();
+		updateParticlesTimeMicS += std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+
+		return;
+
+	// Without CUDA
+	} else {
+
+		std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
+
+		// Guide all particles towards the current best position.
+		Particle *best = particles.at(bestParticleIdx);
+
+		for(Particle *p : particles) {
+			//p->update(best->x);
+			p->updateVelocity(best->x);
+			p->updatePosition();
+			p->updateFuncValue();
+		}
+
+		std::chrono::high_resolution_clock::time_point end = std::chrono::high_resolution_clock::now();
+		updateParticlesTimeMicS += std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
 	}
-	// Allocate device position array
-	cudaStatus = cudaMallocPitch(&devxx, &pitch, decDim * sizeof(float), sSize);
-	if(cudaStatus != cudaSuccess) {
-		fprintf(stderr, "cudaMallocPitch position failed!");
-		goto Error;
-	}
-	// Allocate device velocity array
-	cudaStatus = cudaMallocPitch(&devvv, &pitch, decDim * sizeof(float), sSize);
-	if(cudaStatus != cudaSuccess) {
-		fprintf(stderr, "cudaMallocPitch velocity failed!");
-		goto Error;
-	}
-
-	cudaStatus = cudaGetLastError();
-	if(cudaStatus != cudaSuccess) {
-		fprintf(stderr, "cudaMallocPitch failed: %s\n", cudaGetErrorString(cudaStatus));
-		goto Error;
-	}
-	// Copy positions to device array
-	cudaStatus = cudaMemcpy2D(devxx, pitch, xx, decDim * sizeof(float), decDim * sizeof(float), size, cudaMemcpyHostToDevice);
-	if(cudaStatus != cudaSuccess) {
-		fprintf(stderr, "cudaMemcpy failed!");
-		goto Error;
-	}
-	// Copy velocities to device array
-	cudaStatus = cudaMemcpy2D(devvv, pitch, vv, decDim * sizeof(float), decDim * sizeof(float), size, cudaMemcpyHostToDevice);
-	if(cudaStatus != cudaSuccess) {
-		fprintf(stderr, "cudaMemcpy failed!");
-		goto Error;
-	}
-
-	cudaStatus = cudaGetLastError();
-	if(cudaStatus != cudaSuccess) {
-		fprintf(stderr, "cudaMemcpy failed: %s\n", cudaGetErrorString(cudaStatus));
-		goto Error;
-	}
-
-	// Guide all particles towards the current best position.
-	Particle *best = particles.at(bestParticleIdx);
-
-	dim3 gridSize(iDivUp(decDim, BLOCKSIZE_x), iDivUp(size, BLOCKSIZE_y));
-	dim3 blockSize(BLOCKSIZE_y, BLOCKSIZE_x);
-
-	// Check for any errors launching the kernel
-	cudaStatus = cudaGetLastError();
-	if(cudaStatus != cudaSuccess) {
-		fprintf(stderr, "2  failed: %s\n", cudaGetErrorString(cudaStatus));
-		goto Error;
-	}
-
-	// Kernel call
-	updateParticlePositionsKernel << <gridSize, blockSize >> > (devvv, devxx, pitch, size, decDim);
-
-	// Check for any errors launching the kernel
-	cudaStatus = cudaGetLastError();
-	if(cudaStatus != cudaSuccess) {
-		fprintf(stderr, "updateParticlePositionsKernel launch failed: %s\n", cudaGetErrorString(cudaStatus));
-		goto Error;
-	}
-
-	// cudaDeviceSynchronize waits for the kernel to finish, and returns
-	// any errors encountered during the launch.
-	cudaStatus = cudaDeviceSynchronize();
-	if(cudaStatus != cudaSuccess) {
-		fprintf(stderr, "cudaDeviceSynchronize returned error code %d after launching updateParticlePositionsKernel!\n", cudaStatus);
-		goto Error;
-	}
-
-
-	// Copy position array from GPU buffer to host memory.
-	cudaStatus = cudaMemcpy2D(xx, decDim * sizeof(float), devxx, pitch, decDim * sizeof(float), size, cudaMemcpyDeviceToHost);
-	if(cudaStatus != cudaSuccess) {
-		fprintf(stderr, "cudaMemcpy back to host failed!");
-		goto Error;
-	}
-
-	// Copy velocity array from GPU buffer to host memory.
-	cudaStatus = cudaMemcpy2D(vv, decDim * sizeof(float), devvv, pitch, decDim * sizeof(float), size, cudaMemcpyDeviceToHost);
-	if(cudaStatus != cudaSuccess) {
-		fprintf(stderr, "cudaMemcpy back to host failed!");
-		goto Error;
-	}
-
-	/* The particles have to be updated after every time that there has been changes to
-	positions so that the function evaluation can be done on CPU-side.*/
-	arraysToParticles();
-
-	for(Particle *p : particles) {
-		p->update(best->x);
-	}
-
-	std::chrono::high_resolution_clock::time_point end = std::chrono::high_resolution_clock::now();
-	updateParticlesTimeMicS += std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
 
 	updateBest();
 
-Error:
-	cudaFree(devxx);
-	cudaFree(devvv);
-
-	return;
 }
 
 __host__ void Swarm::updateBest() {

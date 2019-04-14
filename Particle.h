@@ -48,12 +48,28 @@ public:
 	~Particle();
 
 	/**
+	  Update velocity clamped to maxVel in any axis.
+	 */
+	void updateVelocity(std::vector<float> direction);
+
+	/**
+	  Update particle to a new position based on current velocity.
+	  The new velocity must be calculated before calling this.
+	 */
+	void updatePosition();
+
+	/**
+	  Update function value and set best x and fVal if needed.
+	 */
+	void updateFuncValue();
+
+	/**
 	  Update particle's position and velociy.
 
 	  @param direction Best local or global position towards which the particle
 					 should accelerate.
 	 */
-	void update(std::vector<float> direction);
+	//void update(std::vector<float> direction);
 
 	/**
 	Print something to standard stream. 
@@ -73,21 +89,6 @@ private:
 	/* Maximum velocity along any coordinate axis. */
 	const float maxVel = 1.0f;
 
-	/**
-	  Update velocity clamped to maxVel in any axis.
-	 */
-	void updateVelocity(std::vector<float> direction);
-
-	/**
-	  Update particle to a new position based on current velocity.
-	  The new velocity must be calculated before calling this.
-	 */
-	void updatePosition();
-
-	/**
-	  Update function value and set best x and fVal if needed.
-	 */
-	void updateFuncValue();
 
 	/**
 	Random number in range [0,1[
