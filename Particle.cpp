@@ -30,9 +30,9 @@ Particle::~Particle() {
 void Particle::updateVelocity(std::vector<float> direction) {
 	std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
 
-	vOld = v;
+	//vOld = v;
 	for(int i = 0; i < x.size(); i++) {
-		v[i] = w * vOld[i] + c1 * rnd01() * (xBest[i] - x[i]) + c2 * rnd01() * (direction[i] - x[i]);
+		v[i] = w * v[i] + c1 * rnd01() * (xBest[i] - x[i]) + c2 * rnd01() * (direction[i] - x[i]);
 		if(v[i] > maxVel) {
 			v[i] = maxVel;
 		} else if(v[i] < -maxVel) {
@@ -45,9 +45,9 @@ void Particle::updateVelocity(std::vector<float> direction) {
 
 void Particle::updatePosition() {
 	std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
-	xOld = x;
+	//xOld = x;
 	for(int i = 0; i < x.size(); i++) {
-		x[i] = xOld[i] + v[i];
+		x[i] = x[i] + v[i];
 	}
 	std::chrono::high_resolution_clock::time_point end = std::chrono::high_resolution_clock::now();
 	updatePosTimeMicS += std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();

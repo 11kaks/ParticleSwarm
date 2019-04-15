@@ -13,6 +13,20 @@
 #define BLOCKSIZE_x 32
 #define BLOCKSIZE_y 32
 
+
+
+int iDivUp(int hostPtr, int b) {
+	return ((hostPtr % b) != 0) ? (hostPtr / b + 1) : (hostPtr / b);
+}
+
+
+__global__ void setup_kernel(curandState *state) {
+	int id = threadIdx.x + blockDim.x * blockIdx.x;
+	/* Each thread gets same seed, a different sequence
+	   number, no offset */
+	curand_init(1234, id, 0, &state[id]);
+}
+
 Swarm::Swarm(const std::size_t size, const std::size_t dim, OP &problem) :
 	size(size),
 	decDim(dim),
@@ -21,6 +35,21 @@ Swarm::Swarm(const std::size_t size, const std::size_t dim, OP &problem) :
 	xb = new float[size*dim];
 	vv = new float[size*dim];
 	xbg = new float[dim];
+
+	cudaError_t cudaStatus;
+
+	cudaStatus = cudaMalloc((void **)&RNGstate, BLOCKSIZE_x * sizeof(curandState));
+	if(cudaStatus != cudaSuccess) {
+		fprintf(stderr, "cudaMalloc RNG state failed: %s\n", cudaGetErrorString(cudaStatus));
+	}
+	dim3 gridSize(iDivUp(decDim, BLOCKSIZE_x), iDivUp(size, BLOCKSIZE_y));
+	dim3 blockSize(BLOCKSIZE_y, BLOCKSIZE_x);
+	setup_kernel << <1, 1 >> > (RNGstate);
+
+	cudaStatus = cudaGetLastError();
+	if(cudaStatus != cudaSuccess) {
+		fprintf(stderr, "setup_kernel launch failed: %s\n", cudaGetErrorString(cudaStatus));
+	}
 
 	particles.resize(size);
 	std::vector<std::vector<float>> range = problem.getSearchRange();
@@ -63,19 +92,16 @@ Swarm::~Swarm() {
 	delete[] xb;
 	delete[] xbg;
 	delete[] vv;
-
+	cudaFree(RNGstate);
 }
 
-int iDivUp(int hostPtr, int b) {
-	return ((hostPtr % b) != 0) ? (hostPtr / b + 1) : (hostPtr / b);
-}
 
 void Swarm::particlesToArrays() {
 	for(int i = 0; i < size; i++) {
 		Particle *p = particles[i];
 		for(size_t j = 0; j < decDim; ++j) {
 			xx[i*j + j] = p->x[j];
-			xb[i*j + j] = p->xBest[j];
+			xb[i*j + j] = p->x[j];
 			vv[i*j + j] = p->v[j];
 		}
 	}
@@ -86,15 +112,17 @@ void Swarm::arraysToParticles() {
 		Particle *p = particles[i];
 		for(size_t j = 0; j < decDim; ++j) {
 			p->x[j] = xx[i*j + j];
-			p->xBest[j] = xb[i*j + j];
+			// updateFunctionValue() does this if needed
+			//p->xBest[j] = xb[i*j + j];
 			p->v[j] = vv[i*j + j];
 		}
 	}
 }
 
 #define C1 0.3
-#define C2 0.3
+#define C2 1.3
 #define W 0.8
+#define MAX_VEL 1.0
 
 #define CUDA_CALL(x) do { if((x)!=cudaSuccess) { \
     printf("Error at %s:%d\n",__FILE__,__LINE__);\
@@ -103,30 +131,56 @@ void Swarm::arraysToParticles() {
     printf("Error at %s:%d\n",__FILE__,__LINE__);\
     return EXIT_FAILURE;}} while(0)
 
-__global__ void updateParticleVelocityKernel(float *vel, float *pos, float *best, float *gb, size_t pitch, size_t size, size_t dim) {
+__global__ void updateParticleVelocityKernel(float *vel, float *pos, float *best, float *gb, size_t pitch, size_t size, size_t dim, curandState *RNGstate) {
 
-	int tidx = blockIdx.x*blockDim.x + threadIdx.x;
-	int tidy = blockIdx.y*blockDim.y + threadIdx.y;
+	/*int tidx = blockIdx.x*blockDim.x + threadIdx.x;
+	int tidy = blockIdx.y*blockDim.y + threadIdx.y;*/
+	int tidx = threadIdx.x;
+	int tidy = threadIdx.y;
+
+	//printf("access: (%d,%d)\n", tidx, tidy);
+
 
 	if((tidx < dim) && (tidy < size)) {
 		float *posRow = (float *)((char*)pos + tidy * pitch);
-		//posRow[tidx] = 15.f;
 		float *bestRow = (float *)((char*)best + tidy * pitch);
-		//bestRow[tidx] = 1.f;
-		float *gbRow = (float *)((char*)best + 1 * pitch);
-		//gbRow[tidx] = 1.f;
+		float *gbRow = (float *)((char*)gb + 1 * pitch);
 		float *velRow = (float *)((char*)vel + tidy * pitch);
 		//velRow[tidx] = 0.5f;
+
+	/*printf("global best in kernel: (%f, %f)\n", gbRow[0], gbRow[1]);
+	printf("own best in kernel: (%f, %f)\n", bestRow[0], bestRow[1]);*/
+
+		//curandState tstate = RNGstate[tidx];
 
 		//
 		//v[i] = w * vOld[i] + c1 * rnd01() * (xBest[i] - x[i]) + c2 * rnd01() * (direction[i] - x[i]);
 		// placeholder for a random number
-		float rnd = 1.1;
-		velRow[tidx] = W * velRow[tidx] + C1 * rnd * (bestRow[tidx] - posRow[tidx]) + C2 * rnd * (gbRow[tidx] - posRow[tidx]);
+
+		float rnd1 = curand_uniform(RNGstate + tidx);
+		float rnd2 = curand_uniform(RNGstate + tidx);
+
+		/*if(tidx == 0){
+			printf("rnd1 %f\n", rnd1);
+			printf("rnd2 %f\n", rnd2);
+		}*/			
+
+		velRow[tidx] = W * velRow[tidx] + C1 * rnd1 * (bestRow[tidx] - posRow[tidx]) + C2 * rnd2 * (gbRow[tidx] - posRow[tidx]);
+
+		if(velRow[tidx] > MAX_VEL) {
+			velRow[tidx] = MAX_VEL;
+		} else if(velRow[tidx] < -MAX_VEL) {
+			velRow[tidx] = -MAX_VEL;
+		}
+
 		// update position
 		posRow[tidx] = posRow[tidx] + velRow[tidx];
 		//
-	}
+		//RNGstate[tidx] = tstate;
+	} 
+	/*else {
+		printf("loose thread: (%d,%d)\n", tidx, tidy);
+	}*/
 }
 
 /*
@@ -214,7 +268,7 @@ __host__ void Swarm::updateParticlePositions(bool CUDAposvel) {
 		}
 
 		dim3 gridSize(iDivUp(decDim, BLOCKSIZE_x), iDivUp(size, BLOCKSIZE_y));
-		dim3 blockSize(BLOCKSIZE_y, BLOCKSIZE_x);
+		dim3 blockSize(decDim+1, size+1);
 
 		// Check for any errors launching the kernel
 		cudaStatus = cudaGetLastError();
@@ -224,7 +278,8 @@ __host__ void Swarm::updateParticlePositions(bool CUDAposvel) {
 		}
 
 		// Kernel call
-		updateParticleVelocityKernel << <gridSize, blockSize >> > (devvv, devxx, devxb, devxbg, pitch, size, decDim);
+		//updateParticleVelocityKernel << <gridSize, blockSize >> > (devvv, devxx, devxb, devxbg, pitch, size, decDim, RNGstate);
+		updateParticleVelocityKernel << <1, blockSize >> > (devvv, devxx, devxb, devxbg, pitch, size, decDim, RNGstate);
 
 		// Check for any errors launching the kernel
 		cudaStatus = cudaGetLastError();
@@ -266,14 +321,19 @@ __host__ void Swarm::updateParticlePositions(bool CUDAposvel) {
 			goto Error;
 		}
 
-		/* The particles have to be updated after every time that there has been changes to
-		positions so that the function evaluation can be done on CPU-side.*/
-		arraysToParticles();
 
 	Error:
 		cudaFree(devxx);
 		cudaFree(devxb);
 		cudaFree(devvv);
+
+		/* The particles have to be updated after every time that there has been changes to
+		positions so that the function evaluation can be done on CPU-side.*/
+		arraysToParticles();
+		// Funtion value still needs to be updated on CPU side
+		for(Particle *p : particles) {
+			p->updateFuncValue();
+		}
 
 		std::chrono::high_resolution_clock::time_point end = std::chrono::high_resolution_clock::now();
 		updateParticlesTimeMicS += std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
@@ -288,11 +348,9 @@ __host__ void Swarm::updateParticlePositions(bool CUDAposvel) {
 		std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
 
 		// Guide all particles towards the current best position.
-		Particle *best = particles.at(bestParticleIdx);
 
 		for(Particle *p : particles) {
-			//p->update(best->x);
-			p->updateVelocity(best->x);
+			p->updateVelocity(bestParticle->x);
 			p->updatePosition();
 			p->updateFuncValue();
 		}
@@ -302,50 +360,46 @@ __host__ void Swarm::updateParticlePositions(bool CUDAposvel) {
 
 		updateBest();
 	}
-
-
 }
 
 __host__ void Swarm::updateBest() {
-	// TODO: can this be parallelized?
-	// Anyways, need to wait for all particles to be updated.
-
 	std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
 
-	for(int i = 0; i < particles.size(); i++) {
+	for(int i = 0; i < particles.size(); ++i) {
 		Particle *p = particles.at(i);
 		float val = p->fVal;
 		fEvals += p->fEvals;
 		if(val < bestVal) {
-			bestParticleIdx = i;
+
+			printf("%.20f < %.20f \n", val, bestVal);
+
 			bestVal = val;
-		}
-	}
-
+			bestParticle = p;
 	// This update is for CUDA kernel methods.
-	Particle *bestParticle = particles[bestParticleIdx];
-	for(size_t i = 0; i < decDim; ++i) {
-		xbg[i] = bestParticle->x[i];
+			for(size_t k = 0; k < decDim; ++k) {
+				xbg[k] = p->x[k];
+			}
+		} 
+		/*else {
+			printf("val %f \n", val, bestVal);
+		}*/
 	}
-
-	//std::cout << "update best (" << xbg[0] << "," << xbg[1] <<")" << std::endl;
 
 	std::chrono::high_resolution_clock::time_point end = std::chrono::high_resolution_clock::now();
 	updateBestTimeMicS += std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
 }
 
-float Swarm::randMToN(float M, float N) {
+__host__ float Swarm::randMToN(float M, float N) {
 	return M + (rand() / (RAND_MAX / (N - M)));
 }
 
-void Swarm::print() {
-	std::vector<float> x = particles.at(bestParticleIdx)->x;
-	float best = particles.at(bestParticleIdx)->fVal;
-	std::cout << "Swarm's best f(" << x[0] << "," << x[1] << ") = " << best << std::endl;
+__host__ void Swarm::print() {
+	printf("Swarm's best f(%.6f,%.6f) =  %.20f \n", bestParticle->xBest[0], bestParticle->xBest[1], bestParticle->valBest);
+	//std::cout << "Swarm's best f(" << bestParticle->xBest[0] << "," << bestParticle->xBest[1] << ") = " << bestParticle->valBest << std::endl;
 	std::cout << "---------------------------------------------" << std::endl;
 }
 
-void Swarm::printParticles() {
+__host__ void Swarm::printParticles() {
 	for(Particle *p : particles) {
 		p->print();
 	}

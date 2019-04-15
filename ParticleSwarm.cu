@@ -5,7 +5,6 @@
 #include "Rastriging.h"
 #include "Particle.h"
 #include "Swarm.h"
-#include "XM.h"
 
 /*
 To set CUDA working with Visual Studio 2017:
@@ -18,6 +17,8 @@ and it should build.
 
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
+// Clock
+#include <chrono>
 
 #include <iostream>
 #include <vector>
@@ -26,60 +27,70 @@ and it should build.
 
 static void testSwarm(OP &op) {
 	bool useCuda = true;
-	bool CUDAposvel = true;
-	XM xm;
+	bool CUDAposvel = false;
 	// TODO: Create particles based on warp size?
 	const int size = 20;
 	const int dim = 2; // OP decision space dimension
 	Swarm swarm(size, dim, op);
-	int generations = 1000;
+	int generations = 10000;
 
 	
 
 	if(CUDAposvel) {
 		std::cout << "First generation:" << std::endl;
 		swarm.print();
-		for(int i = 0; i < size; i++) {
+		/*for(int i = 0; i < size; i++) {
 			for(size_t j = 1; j < dim; ++j) {
-				std::cout << "(" << swarm.xx[i*j - 1 + j] << "," << swarm.xx[i*j + j] << ") -> ("
+				std::vector<float> x = { swarm.xx[i*(j - 1) + j - 1], swarm.xx[i*j + j] };
+				std::vector<float> xb = { swarm.xb[i*(j - 1) + j - 1], swarm.xb[i*j + j] };
+				std::cout << "(" << swarm.xx[i*j - 1 + j] << "," << swarm.xx[i*j + j] << ") V ("
+					<< op.evaluate(xb) << ") -> ("
 					<< swarm.vv[i*j - 1 + j] << "," << swarm.vv[i*j + j] << ") B ("
-					<< swarm.xb[i*j - 1 + j] << "," << swarm.xb[i*j + j] << ")"
+					<< swarm.xb[i*j - 1 + j] << "," << swarm.xb[i*j + j] << ") BV ("
+					<< op.evaluate(xb) << ")"
 					<< std::endl;
 			}
-		}
+		}*/
 	} else {
 		std::cout << "First generation:" << std::endl;
 		swarm.print();
+		//swarm.printParticles();
 	}
 
-	xm.startSwarm(std::chrono::high_resolution_clock::now());
+	std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
 
 	for(int i = 0; i < generations; ++i) {
 		swarm.updateParticlePositions(CUDAposvel);
 	}
-	xm.endSwarm(std::chrono::high_resolution_clock::now());
+	std::chrono::high_resolution_clock::time_point end = std::chrono::high_resolution_clock::now();
+	int runtime = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
 	swarm.end();
 
 	if(CUDAposvel) {
 		std::cout << "Last generation:" << std::endl;
 		swarm.print();
-		for(int i = 0; i < size; i++) {
+		/*for(int i = 0; i < size; i++) {
 			for(size_t j = 1; j < dim; ++j) {
-				std::cout << "(" << swarm.xx[i*j - 1 + j] << "," << swarm.xx[i*j + j] << ") -> ("
+				std::vector<float> x = { swarm.xx[i*(j - 1) + j - 1], swarm.xx[i*j + j] };
+				std::vector<float> xb = { swarm.xb[i*(j - 1) + j - 1], swarm.xb[i*j + j] };
+				std::cout << "(" << swarm.xx[i*j - 1 + j] << "," << swarm.xx[i*j + j] << ") V ("
+					<< op.evaluate(xb) << ") -> ("
 					<< swarm.vv[i*j - 1 + j] << "," << swarm.vv[i*j + j] << ") B ("
-					<< swarm.xb[i*j - 1 + j] << "," << swarm.xb[i*j + j] << ")"
+					<< swarm.xb[i*j - 1 + j] << "," << swarm.xb[i*j + j] << ") BV ("
+					<< op.evaluate(xb) << ")"
 					<< std::endl;
 			}
-		}
+		}*/
 	} else {
 		std::cout << "Last generation:" << std::endl;
 		swarm.print();
+		//swarm.printParticles(); 
 	}
 
 
 
 	std::cout << "-- " << op.name << " problem --" << std::endl;
-	std::cout << "Running the swarm took: " << xm.swarmDuration << " s." << std::endl;
+	std::cout << "Running the swarm took: " << runtime << " s." << std::endl;
 	std::cout << "of which " << std::endl;
 	std::cout << "initialization      " << swarm.initTimeMicS << " micro seconds." << std::endl;
 	std::cout << "updating best value " << swarm.updateBestTimeMicS << " micro seconds." << std::endl;
@@ -99,7 +110,7 @@ static void testSwarm(OP &op) {
 		<< upgrade << sep
 		<< generations << sep
 		<< size << sep
-		<< xm.swarmDuration * 1000000 << sep
+		<< runtime * 1000000 << sep
 		<< swarm.initTimeMicS << sep
 		<< swarm.updateBestTimeMicS << sep
 		<< swarm.updateParticlesTimeMicS << sep

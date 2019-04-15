@@ -9,23 +9,30 @@
 
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
+// For RNG
+#include <cuda.h>
+#include <curand_kernel.h>
 
 class Swarm
 {
 public:
 
 	std::vector<Particle*> particles;
+	Particle* bestParticle;
 	/* Particle positions as flattened 2D array. Particle i's position
 	along axis j is at index i*j + j.*/
 	float *xx;
 	/* Particle velocities as flattened 2D array. Particle i's velocity
 	along axis j is at index i*j + j.*/
 	float *vv;
-	/* Particle's best personal position. */
+	/* Particle's best personal position. Particle i's best position
+	along axis j is at index i*j + j.*/
 	float *xb;
 	/* The global best position of the whole swarm. A single position, not a 
 	list of positions so it's a 1D array. */
 	float *xbg;
+
+	curandState_t *RNGstate;
 
 	const size_t decDim;
 	const size_t size;
@@ -40,7 +47,7 @@ public:
 	/* Best value of current generation. */
 	float bestVal = 100000;
 	/* Index of the best particle. */
-	int bestParticleIdx = 0;
+	//int bestParticleIdx = 0;
 
 	int fEvals = 0;
 
@@ -50,12 +57,12 @@ public:
 	/**
 	Print best value of the swarm.
 	*/
-	void print();
+	__host__ void print();
 
 	/**
 	Print particles of the swarm.
 	*/
-	void printParticles();
+	__host__ void printParticles();
 
 	/**
 	 * Update all particles in the list using global or local paradigm.
