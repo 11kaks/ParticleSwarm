@@ -367,8 +367,7 @@ __host__ void Swarm::updateParticlePositions(bool CUDAposvel) {
 		// Guide all particles towards the current best position.
 
 		for(Particle *p : particles) {
-			p->updateVelocity(bestParticle->x);
-			p->updatePosition();
+			p->updateVelPos(bestParticle->x);
 			p->updateFuncValue();
 		}
 

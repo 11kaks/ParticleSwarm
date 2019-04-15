@@ -28,26 +28,23 @@ and it should build.
 
 static void prinRun(OP &op, Swarm &s, bool CUDAPosVel, int runtimeMicS) {
 
-	char t = '\t';
 	std::string mics = " us";
 
 	printf("-- %s -- \n", op.name.c_str());
 	printf("Running the swarm took: %.4f s \n", runtimeMicS / 1000000.0);
 	printf(" of which \n");
-	std::cout << "initialization                         " << s.durInit.count() << mics << std::endl;
-	std::cout << "updating best value                    " << s.durUBest.count() << mics << std::endl;
-	std::cout << "updating positions and velocities      " << s.durPPosVel.count() << mics << std::endl;
-	std::cout << "updating function values               " << s.durPFun.count() << mics << std::endl;
+	std::cout << "initialization                         " << (int)s.durInit.count() << mics << std::endl;
+	std::cout << "updating best value                    " << (int)s.durUBest.count() << mics << std::endl;
+	std::cout << "updating positions and velocities      " << (int)s.durPPosVel.count() << mics << std::endl;
+	std::cout << "updating function values               " << (int)s.durPFun.count() << mics << std::endl;
 
 	if(CUDAPosVel) {
-		std::cout << "making memory copies               " << s.durMemcpy.count() << mics << std::endl;
+		std::cout << "making memory copies               " << (int)s.durMemcpy.count() << mics << std::endl;
 	}
 }
 
 
 static void prinRunCSV(OP &op, Swarm &s, bool CUDAPosVel, int runtimeMicS, int generations, int size) {
-	// Print out csv-style to be pasted in Excel
-	char sep = ';';
 	// Few words how this version is different from base version.
 	std::string upgrade = "Base";
 	printf("%s;%d;%d;%d;%d;%d;%d;%d;%d   \n"
@@ -55,16 +52,15 @@ static void prinRunCSV(OP &op, Swarm &s, bool CUDAPosVel, int runtimeMicS, int g
 		, generations
 		, size
 		, runtimeMicS
-		, s.durInit.count()
-		, s.durUBest.count()
-		, s.durPPosVel.count()
-		, s.durPFun.count()
-		, s.durMemcpy.count()
+		, (int)s.durInit.count()
+		, (int)s.durUBest.count()
+		, (int)s.durPPosVel.count()
+		, (int)s.durPFun.count()
+		, (int)s.durMemcpy.count()
 	);
 }
 
 static void testSwarm(OP &op) {
-	bool useCuda = true;
 	bool CUDAposvel = false;
 	// TODO: Create particles based on warp size?
 	const int size = 20;

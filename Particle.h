@@ -43,13 +43,13 @@ public:
 	/**
 	  Update velocity clamped to maxVel in any axis.
 	 */
-	void updateVelocity(std::vector<float> direction);
+	void updateVelPos(std::vector<float> direction);
 
 	/**
 	  Update particle to a new position based on current velocity.
 	  The new velocity must be calculated before calling this.
 	 */
-	void updatePosition();
+	//void updatePosition();
 
 	/**
 	  Update function value and set best x and fVal if needed.

@@ -20,7 +20,7 @@ Particle::Particle(std::vector<float> initialX, std::vector<float> initialV, OP 
 Particle::~Particle() {
 }
 
-void Particle::updateVelocity(std::vector<float> direction) {
+void Particle::updateVelPos(std::vector<float> direction) {
 	for(int i = 0; i < x.size(); i++) {
 		v[i] = w * v[i] + c1 * rnd01() * (xBest[i] - x[i]) + c2 * rnd01() * (direction[i] - x[i]);
 		if(v[i] > maxVel) {
@@ -28,11 +28,6 @@ void Particle::updateVelocity(std::vector<float> direction) {
 		} else if(v[i] < -maxVel) {
 			v[i] = -maxVel;
 		}
-	}
-}
-
-void Particle::updatePosition() {
-	for(int i = 0; i < x.size(); i++) {
 		x[i] = x[i] + v[i];
 	}
 }
