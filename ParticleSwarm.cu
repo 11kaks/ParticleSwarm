@@ -25,6 +25,44 @@ and it should build.
 #include <string>
 #include <stdio.h> 
 
+
+static void prinRun(OP &op, Swarm &s, bool CUDAPosVel, int runtimeMicS) {
+
+	char t = '\t';
+	std::string mics = " us";
+
+	printf("-- %s -- \n", op.name.c_str());
+	printf("Running the swarm took: %.4f s \n", runtimeMicS / 1000000.0);
+	printf(" of which \n");
+	std::cout << "initialization                         " << s.durInit.count() << mics << std::endl;
+	std::cout << "updating best value                    " << s.durUBest.count() << mics << std::endl;
+	std::cout << "updating positions and velocities      " << s.durPPosVel.count() << mics << std::endl;
+	std::cout << "updating function values               " << s.durPFun.count() << mics << std::endl;
+
+	if(CUDAPosVel) {
+		std::cout << "making memory copies               " << s.durMemcpy.count() << mics << std::endl;
+	}
+}
+
+
+static void prinRunCSV(OP &op, Swarm &s, bool CUDAPosVel, int runtimeMicS, int generations, int size) {
+	// Print out csv-style to be pasted in Excel
+	char sep = ';';
+	// Few words how this version is different from base version.
+	std::string upgrade = "Base";
+	printf("%s;%d;%d;%d;%d;%d;%d;%d;%d   \n"
+		, upgrade.c_str()
+		, generations
+		, size
+		, runtimeMicS
+		, s.durInit.count()
+		, s.durUBest.count()
+		, s.durPPosVel.count()
+		, s.durPFun.count()
+		, s.durMemcpy.count()
+	);
+}
+
 static void testSwarm(OP &op) {
 	bool useCuda = true;
 	bool CUDAposvel = false;
@@ -32,7 +70,7 @@ static void testSwarm(OP &op) {
 	const int size = 20;
 	const int dim = 2; // OP decision space dimension
 	Swarm swarm(size, dim, op);
-	int generations = 10000;
+	int generations = 1000;
 
 	
 
@@ -64,7 +102,6 @@ static void testSwarm(OP &op) {
 	}
 	std::chrono::high_resolution_clock::time_point end = std::chrono::high_resolution_clock::now();
 	int runtime = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
-	swarm.end();
 
 	if(CUDAposvel) {
 		std::cout << "Last generation:" << std::endl;
@@ -87,38 +124,9 @@ static void testSwarm(OP &op) {
 		//swarm.printParticles(); 
 	}
 
+	prinRun(op, swarm, CUDAposvel, runtime);
+	prinRunCSV(op, swarm, CUDAposvel, runtime, generations, size);
 
-
-	std::cout << "-- " << op.name << " problem --" << std::endl;
-	std::cout << "Running the swarm took: " << runtime << " s." << std::endl;
-	std::cout << "of which " << std::endl;
-	std::cout << "initialization      " << swarm.initTimeMicS << " micro seconds." << std::endl;
-	std::cout << "updating best value " << swarm.updateBestTimeMicS << " micro seconds." << std::endl;
-	std::cout << "updating particles  " << swarm.updateParticlesTimeMicS << " micro seconds." << std::endl;
-	std::cout << "of which" << std::endl;
-	std::cout << "updating positions       " << swarm.updatePosTimeMicS << " micro seconds." << std::endl;
-	std::cout << "updating velocities      " << swarm.updateVelTimeMicS << " micro seconds." << std::endl;
-	std::cout << "updating function values " << swarm.updateFunTimeMicS << " micro seconds." << std::endl;
-	std::cout << "Total function evaluations " << swarm.fEvals << std::endl;
-
-	// Print out csv-style to be pasted in Excel
-	char sep = ';';
-	// Few words how this version is different from base version.
-	std::string upgrade = "Base";
-	std::cout
-		<< std::fixed
-		<< upgrade << sep
-		<< generations << sep
-		<< size << sep
-		<< runtime * 1000000 << sep
-		<< swarm.initTimeMicS << sep
-		<< swarm.updateBestTimeMicS << sep
-		<< swarm.updateParticlesTimeMicS << sep
-		<< swarm.updatePosTimeMicS << sep
-		<< swarm.updateVelTimeMicS << sep
-		<< swarm.updateFunTimeMicS << sep
-		<< swarm.fEvals
-		<< std::endl;
 }
 
 int main() {

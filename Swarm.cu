@@ -27,10 +27,15 @@ __global__ void setup_kernel(curandState *state) {
 	curand_init(1234, id, 0, &state[id]);
 }
 
-Swarm::Swarm(const std::size_t size, const std::size_t dim, OP &problem) :
+Swarm::Swarm(const std::size_t size, const std::size_t dim, OP &problem) 
+	:
 	size(size),
 	decDim(dim),
-	op(problem) {
+	op(problem) 
+{
+
+	std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
+
 	xx = new float[size*dim];
 	xb = new float[size*dim];
 	vv = new float[size*dim];
@@ -60,7 +65,6 @@ Swarm::Swarm(const std::size_t size, const std::size_t dim, OP &problem) :
 	std::vector<float> x(probdim);
 	std::vector<float> v(x.size());
 
-	std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
 	// TODO: this could be parallellized. Propably not a big speedup.
 	for(int k = 0; k < size; k++) {
 		for(int i = 0; i < x.size(); ++i) {
@@ -78,7 +82,7 @@ Swarm::Swarm(const std::size_t size, const std::size_t dim, OP &problem) :
 	particlesToArrays();
 
 	std::chrono::high_resolution_clock::time_point end = std::chrono::high_resolution_clock::now();
-	initTimeMicS = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+	durInit = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
 
 	updateBest();
 }
@@ -189,7 +193,7 @@ https://stackoverflow.com/questions/39006348/accessing-class-data-members-from-w
 __host__ void Swarm::updateParticlePositions(bool CUDAposvel) {
 
 	if(CUDAposvel) {
-		std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
+		std::chrono::high_resolution_clock::time_point startMemcpy1 = std::chrono::high_resolution_clock::now();
 		cudaError_t cudaStatus;
 
 		float * devxx;
@@ -261,11 +265,11 @@ __host__ void Swarm::updateParticlePositions(bool CUDAposvel) {
 			goto Error;
 		}
 
-		cudaStatus = cudaGetLastError();
-		if(cudaStatus != cudaSuccess) {
-			fprintf(stderr, "cudaMemcpy failed: %s\n", cudaGetErrorString(cudaStatus));
-			goto Error;
-		}
+
+		std::chrono::high_resolution_clock::time_point endMemcpy1 = std::chrono::high_resolution_clock::now();
+		std::chrono::microseconds durMemcpy1 = std::chrono::duration_cast<std::chrono::microseconds>(endMemcpy1 - startMemcpy1);
+
+		std::chrono::high_resolution_clock::time_point startPosVel = std::chrono::high_resolution_clock::now();
 
 		dim3 gridSize(iDivUp(decDim, BLOCKSIZE_x), iDivUp(size, BLOCKSIZE_y));
 		dim3 blockSize(decDim+1, size+1);
@@ -296,6 +300,11 @@ __host__ void Swarm::updateParticlePositions(bool CUDAposvel) {
 			goto Error;
 		}
 
+		std::chrono::high_resolution_clock::time_point endPosVel = std::chrono::high_resolution_clock::now();
+		durPPosVel += std::chrono::duration_cast<std::chrono::microseconds>(endPosVel - startPosVel);
+
+		std::chrono::high_resolution_clock::time_point startMemcpy2 = std::chrono::high_resolution_clock::now();
+
 		// Copy position array from GPU buffer to host memory.
 		cudaStatus = cudaMemcpy2D(xx, decDim * sizeof(float), devxx, pitch, decDim * sizeof(float), size, cudaMemcpyDeviceToHost);
 		if(cudaStatus != cudaSuccess) {
@@ -322,21 +331,29 @@ __host__ void Swarm::updateParticlePositions(bool CUDAposvel) {
 		}
 
 
+
 	Error:
 		cudaFree(devxx);
 		cudaFree(devxb);
+		cudaFree(devxbg);
 		cudaFree(devvv);
 
 		/* The particles have to be updated after every time that there has been changes to
 		positions so that the function evaluation can be done on CPU-side.*/
 		arraysToParticles();
+
+		std::chrono::high_resolution_clock::time_point endMemcpy2 = std::chrono::high_resolution_clock::now();
+		durMemcpy += std::chrono::duration_cast<std::chrono::microseconds>(endMemcpy2 - startMemcpy2) + durMemcpy1;
+
+		std::chrono::high_resolution_clock::time_point startFun = std::chrono::high_resolution_clock::now();
+
 		// Funtion value still needs to be updated on CPU side
 		for(Particle *p : particles) {
 			p->updateFuncValue();
 		}
 
-		std::chrono::high_resolution_clock::time_point end = std::chrono::high_resolution_clock::now();
-		updateParticlesTimeMicS += std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+		std::chrono::high_resolution_clock::time_point endFun = std::chrono::high_resolution_clock::now();
+		durPFun += std::chrono::duration_cast<std::chrono::microseconds>(endFun - startFun);
 
 		updateBest();
 
@@ -356,7 +373,7 @@ __host__ void Swarm::updateParticlePositions(bool CUDAposvel) {
 		}
 
 		std::chrono::high_resolution_clock::time_point end = std::chrono::high_resolution_clock::now();
-		updateParticlesTimeMicS += std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+		durPPosVel += std::chrono::duration_cast<std::chrono::microseconds>(end - start);
 
 		updateBest();
 	}
@@ -368,7 +385,6 @@ __host__ void Swarm::updateBest() {
 	for(int i = 0; i < particles.size(); ++i) {
 		Particle *p = particles.at(i);
 		float val = p->fVal;
-		fEvals += p->fEvals;
 		if(val < bestVal) {
 
 			printf("%.20f < %.20f \n", val, bestVal);
@@ -386,7 +402,7 @@ __host__ void Swarm::updateBest() {
 	}
 
 	std::chrono::high_resolution_clock::time_point end = std::chrono::high_resolution_clock::now();
-	updateBestTimeMicS += std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+	durUBest += std::chrono::duration_cast<std::chrono::microseconds>(end - start);
 }
 
 __host__ float Swarm::randMToN(float M, float N) {

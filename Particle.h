@@ -29,13 +29,6 @@ public:
 	/* Optimization problem. */
 	OP &op;
 
-	// Execution metrics
-	int fEvals = 0;
-
-	int updateVelTimeMicS = 0;
-	int updatePosTimeMicS = 0;
-	int updateFunTimeMicS = 0;
-
 	/**
 	Create a new particle.
 
@@ -62,14 +55,6 @@ public:
 	  Update function value and set best x and fVal if needed.
 	 */
 	void updateFuncValue();
-
-	/**
-	  Update particle's position and velociy.
-
-	  @param direction Best local or global position towards which the particle
-					 should accelerate.
-	 */
-	//void update(std::vector<float> direction);
 
 	/**
 	Print something to standard stream. 
