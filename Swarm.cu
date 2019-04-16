@@ -4,6 +4,7 @@
 #include <iostream>
 #include <vector>
 #include <stdlib.h>
+#include <math.h>
 #include <chrono>
 
 
@@ -27,12 +28,11 @@ __global__ void setup_kernel(curandState *state) {
 	curand_init(1234, id, 0, &state[id]);
 }
 
-Swarm::Swarm(const std::size_t size, const std::size_t dim, OP &problem) 
+Swarm::Swarm(const std::size_t size, const std::size_t dim, OP &problem)
 	:
 	size(size),
 	decDim(dim),
-	op(problem) 
-{
+	op(problem) {
 
 	std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
 
@@ -137,10 +137,9 @@ void Swarm::arraysToParticles() {
 
 __global__ void updateParticleVelocityKernel(float *vel, float *pos, float *best, float *gb, size_t pitch, size_t size, size_t dim, curandState *RNGstate) {
 
-	/*int tidx = blockIdx.x*blockDim.x + threadIdx.x;
-	int tidy = blockIdx.y*blockDim.y + threadIdx.y;*/
-	int tidx = threadIdx.x;
-	int tidy = threadIdx.y;
+	int tidx = /*blockIdx.x * blockDim.x +*/ threadIdx.x;
+	int tidy = blockIdx.y * blockDim.y + threadIdx.y;
+
 
 	//printf("access: (%d,%d)\n", tidx, tidy);
 
@@ -155,11 +154,11 @@ __global__ void updateParticleVelocityKernel(float *vel, float *pos, float *best
 	/*printf("global best in kernel: (%f, %f)\n", gbRow[0], gbRow[1]);
 	printf("own best in kernel: (%f, %f)\n", bestRow[0], bestRow[1]);*/
 
-		//curandState tstate = RNGstate[tidx];
+	//curandState tstate = RNGstate[tidx];
 
-		//
-		//v[i] = w * vOld[i] + c1 * rnd01() * (xBest[i] - x[i]) + c2 * rnd01() * (direction[i] - x[i]);
-		// placeholder for a random number
+	//
+	//v[i] = w * vOld[i] + c1 * rnd01() * (xBest[i] - x[i]) + c2 * rnd01() * (direction[i] - x[i]);
+	// placeholder for a random number
 
 		float rnd1 = curand_uniform(RNGstate + tidx);
 		float rnd2 = curand_uniform(RNGstate + tidx);
@@ -167,7 +166,7 @@ __global__ void updateParticleVelocityKernel(float *vel, float *pos, float *best
 		/*if(tidx == 0){
 			printf("rnd1 %f\n", rnd1);
 			printf("rnd2 %f\n", rnd2);
-		}*/			
+		}*/
 
 		velRow[tidx] = W * velRow[tidx] + C1 * rnd1 * (bestRow[tidx] - posRow[tidx]) + C2 * rnd2 * (gbRow[tidx] - posRow[tidx]);
 
@@ -181,7 +180,7 @@ __global__ void updateParticleVelocityKernel(float *vel, float *pos, float *best
 		posRow[tidx] = posRow[tidx] + velRow[tidx];
 		//
 		//RNGstate[tidx] = tstate;
-	} 
+	}
 	/*else {
 		printf("loose thread: (%d,%d)\n", tidx, tidy);
 	}*/
@@ -190,7 +189,7 @@ __global__ void updateParticleVelocityKernel(float *vel, float *pos, float *best
 /*
 https://stackoverflow.com/questions/39006348/accessing-class-data-members-from-within-cuda-kernel-how-to-design-proper-host
 */
-__host__ void Swarm::updateParticlePositions(bool CUDAposvel) {
+__host__ void Swarm::updateParticlePositions(bool CUDAposvel, dim3 gridSize, dim3 blockSize) {
 
 	if(CUDAposvel) {
 		std::chrono::high_resolution_clock::time_point startMemcpy1 = std::chrono::high_resolution_clock::now();
@@ -270,10 +269,7 @@ __host__ void Swarm::updateParticlePositions(bool CUDAposvel) {
 		std::chrono::microseconds durMemcpy1 = std::chrono::duration_cast<std::chrono::microseconds>(endMemcpy1 - startMemcpy1);
 
 		std::chrono::high_resolution_clock::time_point startPosVel = std::chrono::high_resolution_clock::now();
-
-		dim3 gridSize(iDivUp(decDim, BLOCKSIZE_x), iDivUp(size, BLOCKSIZE_y));
-		dim3 blockSize(decDim+1, size+1);
-
+		
 		// Check for any errors launching the kernel
 		cudaStatus = cudaGetLastError();
 		if(cudaStatus != cudaSuccess) {
@@ -283,7 +279,7 @@ __host__ void Swarm::updateParticlePositions(bool CUDAposvel) {
 
 		// Kernel call
 		//updateParticleVelocityKernel << <gridSize, blockSize >> > (devvv, devxx, devxb, devxbg, pitch, size, decDim, RNGstate);
-		updateParticleVelocityKernel << <1, blockSize >> > (devvv, devxx, devxb, devxbg, pitch, size, decDim, RNGstate);
+		updateParticleVelocityKernel << <gridSize, blockSize >> > (devvv, devxx, devxb, devxbg, pitch, size, decDim, RNGstate);
 
 		// Check for any errors launching the kernel
 		cudaStatus = cudaGetLastError();
@@ -359,7 +355,7 @@ __host__ void Swarm::updateParticlePositions(bool CUDAposvel) {
 
 		return;
 
-	// Without CUDA
+		// Without CUDA
 	} else {
 
 		std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
@@ -386,18 +382,16 @@ __host__ void Swarm::updateBest() {
 		float val = p->fVal;
 		if(val < bestVal) {
 
-			printf("%.20f < %.20f \n", val, bestVal);
+			// See the convergence
+			//printf("%.20f < %.20f \n", val, bestVal);
 
 			bestVal = val;
 			bestParticle = p;
-	// This update is for CUDA kernel methods.
+			// This update is for CUDA kernel methods.
 			for(size_t k = 0; k < decDim; ++k) {
 				xbg[k] = p->x[k];
 			}
-		} 
-		/*else {
-			printf("val %f \n", val, bestVal);
-		}*/
+		}
 	}
 
 	std::chrono::high_resolution_clock::time_point end = std::chrono::high_resolution_clock::now();

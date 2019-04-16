@@ -65,7 +65,7 @@ public:
 	/**
 	 * Update all particles in the list using global or local paradigm.
 	 */
-	__host__ void updateParticlePositions(bool CUDAposvel);
+	__host__ void updateParticlePositions(bool CUDAposvel, dim3 gridSize, dim3 blockSize);
 
 	void particlesToArrays();
 	void arraysToParticles();
