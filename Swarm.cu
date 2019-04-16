@@ -14,13 +14,6 @@
 #define BLOCKSIZE_x 32
 #define BLOCKSIZE_y 32
 
-
-
-int iDivUp(int hostPtr, int b) {
-	return ((hostPtr % b) != 0) ? (hostPtr / b + 1) : (hostPtr / b);
-}
-
-
 __global__ void setup_kernel(curandState *state) {
 	int id = threadIdx.x + blockDim.x * blockIdx.x;
 	/* Each thread gets same seed, a different sequence
@@ -28,32 +21,35 @@ __global__ void setup_kernel(curandState *state) {
 	curand_init(1234, id, 0, &state[id]);
 }
 
-Swarm::Swarm(const std::size_t size, const std::size_t dim, OP &problem)
+Swarm::Swarm(const std::size_t size, const std::size_t dim, OP &problem, bool CUDAposvel)
 	:
 	size(size),
 	decDim(dim),
-	op(problem) {
+	op(problem),
+	CUDAposvel(CUDAposvel) {
 
 	std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
 
-	xx = new float[size*dim];
-	xb = new float[size*dim];
-	vv = new float[size*dim];
-	xbg = new float[dim];
+	if(CUDAposvel) {
 
-	cudaError_t cudaStatus;
 
-	cudaStatus = cudaMalloc((void **)&RNGstate, BLOCKSIZE_x * sizeof(curandState));
-	if(cudaStatus != cudaSuccess) {
-		fprintf(stderr, "cudaMalloc RNG state failed: %s\n", cudaGetErrorString(cudaStatus));
-	}
-	dim3 gridSize(iDivUp(decDim, BLOCKSIZE_x), iDivUp(size, BLOCKSIZE_y));
-	dim3 blockSize(BLOCKSIZE_y, BLOCKSIZE_x);
-	setup_kernel << <1, 1 >> > (RNGstate);
+		xx = new float[size*dim];
+		xb = new float[size*dim];
+		vv = new float[size*dim];
+		xbg = new float[dim];
 
-	cudaStatus = cudaGetLastError();
-	if(cudaStatus != cudaSuccess) {
-		fprintf(stderr, "setup_kernel launch failed: %s\n", cudaGetErrorString(cudaStatus));
+		cudaError_t cudaStatus;
+
+		cudaStatus = cudaMalloc((void **)&RNGstate, size * dim * sizeof(curandState));
+		if(cudaStatus != cudaSuccess) {
+			fprintf(stderr, "cudaMalloc RNG state failed: %s\n", cudaGetErrorString(cudaStatus));
+		}
+		setup_kernel << <100, 256 >> > (RNGstate);
+
+		cudaStatus = cudaGetLastError();
+		if(cudaStatus != cudaSuccess) {
+			fprintf(stderr, "setup_kernel launch failed: %s\n", cudaGetErrorString(cudaStatus));
+		}
 	}
 
 	particles.resize(size);
@@ -65,7 +61,6 @@ Swarm::Swarm(const std::size_t size, const std::size_t dim, OP &problem)
 	std::vector<float> x(probdim);
 	std::vector<float> v(x.size());
 
-	// TODO: this could be parallellized. Propably not a big speedup.
 	for(int k = 0; k < size; k++) {
 		for(int i = 0; i < x.size(); ++i) {
 			float a = range[i][0];
@@ -75,7 +70,6 @@ Swarm::Swarm(const std::size_t size, const std::size_t dim, OP &problem)
 			v[i] = 0.f;
 		}
 		particles[k] = new Particle(x, v, problem);
-
 	}
 
 	/* It is enough to copy the particle velocities to the array once. They will be ok after that. */
@@ -92,33 +86,39 @@ Swarm::~Swarm() {
 	for(Particle *p : particles) {
 		delete p;
 	}
-	delete[] xx;
-	delete[] xb;
-	delete[] xbg;
-	delete[] vv;
-	cudaFree(RNGstate);
+	if(CUDAposvel) {
+		delete[] xx;
+		delete[] xb;
+		delete[] xbg;
+		delete[] vv;
+		cudaFree(RNGstate);
+	}
 }
 
 
 void Swarm::particlesToArrays() {
-	for(int i = 0; i < size; i++) {
-		Particle *p = particles[i];
-		for(size_t j = 0; j < decDim; ++j) {
-			xx[i*j + j] = p->x[j];
-			xb[i*j + j] = p->x[j];
-			vv[i*j + j] = p->v[j];
+	if(CUDAposvel) {
+		for(int i = 0; i < size; i++) {
+			Particle *p = particles[i];
+			for(size_t j = 0; j < decDim; ++j) {
+				xx[i*j + j] = p->x[j];
+				xb[i*j + j] = p->x[j];
+				vv[i*j + j] = p->v[j];
+			}
 		}
 	}
 }
 
 void Swarm::arraysToParticles() {
-	for(int i = 0; i < size; i++) {
-		Particle *p = particles[i];
-		for(size_t j = 0; j < decDim; ++j) {
-			p->x[j] = xx[i*j + j];
-			// updateFunctionValue() does this if needed
-			//p->xBest[j] = xb[i*j + j];
-			p->v[j] = vv[i*j + j];
+	if(CUDAposvel) {
+		for(int i = 0; i < size; i++) {
+			Particle *p = particles[i];
+			for(size_t j = 0; j < decDim; ++j) {
+				p->x[j] = xx[i*j + j];
+				// updateFunctionValue() does this if needed
+				//p->xBest[j] = xb[i*j + j];
+				p->v[j] = vv[i*j + j];
+			}
 		}
 	}
 }
@@ -189,7 +189,7 @@ __global__ void updateParticleVelocityKernel(float *vel, float *pos, float *best
 /*
 https://stackoverflow.com/questions/39006348/accessing-class-data-members-from-within-cuda-kernel-how-to-design-proper-host
 */
-__host__ void Swarm::updateParticlePositions(bool CUDAposvel, dim3 gridSize, dim3 blockSize) {
+__host__ void Swarm::updateParticlePositions(dim3 gridSize, dim3 blockSize) {
 
 	if(CUDAposvel) {
 		std::chrono::high_resolution_clock::time_point startMemcpy1 = std::chrono::high_resolution_clock::now();
@@ -269,7 +269,7 @@ __host__ void Swarm::updateParticlePositions(bool CUDAposvel, dim3 gridSize, dim
 		std::chrono::microseconds durMemcpy1 = std::chrono::duration_cast<std::chrono::microseconds>(endMemcpy1 - startMemcpy1);
 
 		std::chrono::high_resolution_clock::time_point startPosVel = std::chrono::high_resolution_clock::now();
-		
+
 		// Check for any errors launching the kernel
 		cudaStatus = cudaGetLastError();
 		if(cudaStatus != cudaSuccess) {
@@ -387,9 +387,11 @@ __host__ void Swarm::updateBest() {
 
 			bestVal = val;
 			bestParticle = p;
-			// This update is for CUDA kernel methods.
-			for(size_t k = 0; k < decDim; ++k) {
-				xbg[k] = p->x[k];
+			if(CUDAposvel) {
+				// This update is for CUDA kernel methods.
+				for(size_t k = 0; k < decDim; ++k) {
+					xbg[k] = p->x[k];
+				}
 			}
 		}
 	}

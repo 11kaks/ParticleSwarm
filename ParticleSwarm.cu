@@ -24,6 +24,7 @@ and it should build.
 #include <vector>
 #include <string>
 #include <stdio.h> 
+#include <math.h>
 
 
 static void printRun(OP &op, Swarm &s, bool CUDAPosVel, int runtimeMicS) {
@@ -43,25 +44,37 @@ static void printRun(OP &op, Swarm &s, bool CUDAPosVel, int runtimeMicS) {
 	}
 }
 
-
-static void prinrRunCSV(std::string upgrade, OP &op, Swarm &s, bool CUDAPosVel, int runtimeMicS, int generations, int size) {
-	printf("%s;%d;%d;%d;%d;%d;%d;%d;%d   \n"
+static void prinrRunCSV(std::string upgrade, float accuracy, Swarm *s, bool CUDAPosVel, int runtimeMicS, int generations, int size) {
+	printf("%s;%d;%d;%.6f;%d;%.6f;%d;%d;%d;%d;%d   \n"
 		, upgrade.c_str()
 		, generations
 		, size
+		, accuracy
 		, runtimeMicS
-		, (int)s.durInit.count()
-		, (int)s.durUBest.count()
-		, (int)s.durPPosVel.count()
-		, (int)s.durPFun.count()
-		, (int)s.durMemcpy.count()
+		, (float)runtimeMicS / 1000000.f
+		, (int)s->durInit.count()
+		, (int)s->durUBest.count()
+		, (int)s->durPPosVel.count()
+		, (int)s->durPFun.count()
+		, (int)s->durMemcpy.count()
 	);
 }
 
-static void runSwarm(std::string upgrade, OP &op, const bool CUDAposvel, const int size, const int iterations) {
+static float distanceFromOptimum(OP &op, std::vector<float> result) {
+	std::vector<float> known = op.getKnownOptimumPoint();
+	float dist = 0.f;
+	for(size_t i = 0; i < op.getDecDimension(); ++i) {
+		dist += (result[i] - known[i]) * (result[i] - known[i]);
+	}
+	return (float)sqrt(dist);
+}
+
+static void runSwarm(std::string upgrade, OP &op, const bool CUDAposvel, const int size, const int iterations, const int maxThreads) {
+
+	std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
 
 	int dim = op.getDecDimension();
-	Swarm swarm(size, dim, op);
+	Swarm *swarm = new Swarm(size, dim, op, CUDAposvel);
 
 	/*
 	Calculate gridsize and blocksize. These are not needed if CUDA is not in use.
@@ -73,9 +86,6 @@ static void runSwarm(std::string upgrade, OP &op, const bool CUDAposvel, const i
 	Consider using grid stride loops?
 	https://devblogs.nvidia.com/cuda-pro-tip-write-flexible-kernels-grid-stride-loops/
 	*/
-	cudaDeviceProp prop;
-	cudaGetDeviceProperties(&prop, 0);
-	int maxThreads = prop.maxThreadsPerBlock;
 	int blockX = dim;
 	// floored by int trunktuation
 	int blockY = maxThreads / blockX;
@@ -85,15 +95,18 @@ static void runSwarm(std::string upgrade, OP &op, const bool CUDAposvel, const i
 	dim3 blockSize(blockX, blockY);
 
 	// Run the swarm
-	std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
 	for(size_t i = 0; i < iterations; ++i) {
-		swarm.updateParticlePositions(CUDAposvel, gridSize, blockSize);
+		swarm->updateParticlePositions(gridSize, blockSize);
 	}
 	std::chrono::high_resolution_clock::time_point end = std::chrono::high_resolution_clock::now();
-	int runtime = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+	int runtime = (int)std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+
+	float accuracy = distanceFromOptimum(op, swarm->bestParticle->xBest);
 
 	//printRun(op, swarm, CUDAposvel, runtime);
-	prinrRunCSV(upgrade, op, swarm, CUDAposvel, runtime, iterations, size);
+	prinrRunCSV(upgrade, accuracy, swarm, CUDAposvel, runtime, iterations, size);
+
+	delete swarm;
 
 }
 
@@ -115,13 +128,16 @@ int main() {
 		printf("  Peak Memory Bandwidth (GB/s): %f\n",
 			2.0*prop.memoryClockRate*(prop.memoryBusWidth / 8) / 1.0e6);
 		printf("  Warp size : %d\n", prop.warpSize);
-		printf("  Max grid size: %f\n", prop.maxGridSize);
 		printf("  Max threads per block : %d\n\n",
 			prop.maxThreadsPerBlock);
 	}
 
 	srand(145623);
-	Rastriging problem;
+	Rastriging problem(20);
+
+	int sizeLevels = 3;
+	int iterationLevels = 2;
+
 	// Few words how this version is different from base version.
 	std::string upgrade = "Base";
 	bool CUDAposvel = false;
@@ -129,15 +145,20 @@ int main() {
 	int iterations = 100;
 
 	// Size loop
-	for(size_t i = 0; i < 3; ++i) {
+	for(size_t i = 0; i < sizeLevels; ++i) {
 		// Iteration loop
-		for(size_t j = 0; j < 2; ++j) {
-			runSwarm(upgrade, problem, CUDAposvel, size, iterations);
+		for(size_t j = 0; j < iterationLevels; ++j) {
+			runSwarm(upgrade, problem, CUDAposvel, size, iterations, 0);
 			iterations *= 10;
 		}
 		iterations = 100; // reset iterations
 		size *= 10;
 	}
+
+
+	cudaDeviceProp prop;
+	cudaGetDeviceProperties(&prop, 0);
+	int maxThreads = prop.maxThreadsPerBlock;
 
 	// Reset and run with CUDA
 	upgrade = "CUDA pos vel";
@@ -146,10 +167,30 @@ int main() {
 	iterations = 100;
 
 	// Size loop
-	for(size_t i = 0; i < 3; ++i) {
+	for(size_t i = 0; i < sizeLevels; ++i) {
 		// Iteration loop
-		for(size_t j = 0; j < 2; ++j) {
-			runSwarm(upgrade, problem, CUDAposvel, size, iterations);
+		for(size_t j = 0; j < iterationLevels; ++j) {
+			runSwarm(upgrade, problem, CUDAposvel, size, iterations, maxThreads);
+			iterations *= 10;
+		}
+		iterations = 100; // reset iterations
+		size *= 10;
+	}
+
+	
+
+	// Reset and run with CUDA
+	upgrade = "CUDA small block";
+	maxThreads = 256;
+	CUDAposvel = true;
+	size = 32;
+	iterations = 100;
+
+	// Size loop
+	for(size_t i = 0; i < sizeLevels; ++i) {
+		// Iteration loop
+		for(size_t j = 0; j < iterationLevels; ++j) {
+			runSwarm(upgrade, problem, CUDAposvel, size, iterations, maxThreads);
 			iterations *= 10;
 		}
 		iterations = 100; // reset iterations

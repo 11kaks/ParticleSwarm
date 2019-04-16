@@ -18,9 +18,12 @@ class Rastriging : public OP
 {
 public:
 	Rastriging();
+	Rastriging(const int decDim);
 	~Rastriging();
 
 	std::vector<std::vector<float>> getSearchRange();
+
+	std::vector<float> getKnownOptimumPoint();
 
 	float evaluateOriginalObjective(std::vector<float> &point);
 

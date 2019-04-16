@@ -10,6 +10,11 @@ Rastriging::Rastriging() {
 	name = "Rastriging";
 }
 
+Rastriging::Rastriging(const int dim) {
+	decDim = dim;
+	name = "Rastriging";
+}
+
 
 Rastriging::~Rastriging() {
 }
@@ -30,15 +35,20 @@ std::vector<std::vector<float>> Rastriging::getSearchRange() {
 	return res;
 }
 
+std::vector<float> Rastriging::getKnownOptimumPoint() {
+	std::vector<float> res(decDim, 0.f);
+	return res;
+}
+
 /*
 Definition := A*n + sum(x_i^2 - A cos(2*PI*x_i)) where A = 10
 and n is the dimension of objective space.
 */
 float  Rastriging::evaluateOriginalObjective(std::vector<float> &point) {
-	int A = 10;
+	float A = 10.f;
 	float res = A * point.size();
 	for(const auto& xi : point) {
-		res += xi * xi - A * cos(2 * PI * xi);
+		res += xi * xi - A * (float)cos(2 * PI * xi);
 	}
 	return res;
 }

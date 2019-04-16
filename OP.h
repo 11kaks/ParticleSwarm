@@ -28,6 +28,11 @@ public:
 	 */
 	virtual std::vector<std::vector<float>> getSearchRange() = 0;
 
+	/*
+	Get known optimum point to asses the accuracy of a run.
+	*/
+	virtual std::vector<float> getKnownOptimumPoint() = 0;
+
 	/**
 	  Dimension of the decision space.
 	 */

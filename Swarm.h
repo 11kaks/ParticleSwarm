@@ -49,7 +49,7 @@ public:
 	/* Best value of current generation. */
 	float bestVal = 100000;
 
-	Swarm(std::size_t size, const std::size_t dim, OP &problem);
+	Swarm(std::size_t size, const std::size_t dim, OP &problem, bool CUDAposvel);
 	~Swarm();
 
 	/**
@@ -65,7 +65,7 @@ public:
 	/**
 	 * Update all particles in the list using global or local paradigm.
 	 */
-	__host__ void updateParticlePositions(bool CUDAposvel, dim3 gridSize, dim3 blockSize);
+	__host__ void updateParticlePositions(dim3 gridSize, dim3 blockSize);
 
 	void particlesToArrays();
 	void arraysToParticles();
@@ -75,7 +75,7 @@ private:
 	/* Optimization problem. */
 	OP &op;
 	/* Global or local paradigm. */
-	const bool useGlobal = true;
+	const bool CUDAposvel;
 
 
 	/**
