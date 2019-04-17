@@ -77,7 +77,7 @@ public:
 	 Using blocks with less or equal to 256 threads may somethimes yield better
 	 accuracy because of how curand RNG works. I'm not sure about it though.
 	 */
-	void updateParticles(dim3 gridSize, dim3 blockSize);
+	int updateParticles(dim3 gridSize, dim3 blockSize);
 	/**
 	Copy particles to arrays for CUDA. Executed only if CUDAposvel = true.
 	*/

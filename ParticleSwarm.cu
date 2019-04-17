@@ -70,10 +70,11 @@ static void runSwarm(const std::string &upgrade, OP &op, const bool CUDAposvel, 
 
 	dim3 gridSize(1, blockCount);
 	dim3 blockSize(blockX, blockY);
-
+	int runStatus = 0;
 	// Run the swarm
 	for(size_t i = 0; i < iterations; ++i) {
-		swarm->updateParticles(gridSize, blockSize);
+		runStatus = swarm->updateParticles(gridSize, blockSize);
+		if(runStatus != 0) break;
 	}
 	std::chrono::high_resolution_clock::time_point end = std::chrono::high_resolution_clock::now();
 	int runtime = (int)std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();

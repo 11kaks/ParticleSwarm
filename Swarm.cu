@@ -132,7 +132,7 @@ __host__ void Swarm::arraysToParticles() {
 	}
 }
 
-__host__ void Swarm::updateParticles(dim3 gridSize, dim3 blockSize) {
+__host__ int Swarm::updateParticles(dim3 gridSize, dim3 blockSize) {
 
 	if(CUDAposvel) {
 		std::chrono::high_resolution_clock::time_point startMemcpy1 = std::chrono::high_resolution_clock::now();
@@ -254,6 +254,7 @@ __host__ void Swarm::updateParticles(dim3 gridSize, dim3 blockSize) {
 			cudaFree(devxb);
 			cudaFree(devxbg);
 			cudaFree(devvv);
+			return 1;
 		}
 		// Free memory if success.
 		cudaFree(devxx);
@@ -273,8 +274,6 @@ __host__ void Swarm::updateParticles(dim3 gridSize, dim3 blockSize) {
 
 		updateBest();
 
-		return;
-
 		// Without CUDA
 	} else {
 		for(Particle *p : particles) {
@@ -290,6 +289,7 @@ __host__ void Swarm::updateParticles(dim3 gridSize, dim3 blockSize) {
 		}
 		updateBest();
 	}
+	return 0;
 }
 
 __global__ void updateParticlePosVelKernel(float *vel, float *pos, float *best, float *gb, size_t pitch, size_t size, size_t dim, curandState *RNGstate) {
