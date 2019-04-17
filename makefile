@@ -1,30 +1,16 @@
-#CC = g++
-#CFLAGS = -c
-#SOURCES =  ParticleSwarm.cpp OP.cpp Rastriging.cpp Particle.cpp Swarm.cpp
-#OBJECTS = $(SOURCES:.cpp=.o)
-#EXECUTABLE = ParticleSwarm
-
-#all: $(OBJECTS) $(EXECUTABLE)
-
-#$(EXECUTABLE) : $(OBJECTS)
-#		$(CC) $(OBJECTS) -o $@  
-
-#.cpp.o: *.h
-#	$(CC) $(CFLAGS) $< -o $@
-
 OBJECTS = ParticleSwarm.o OP.o Rastriging.o Particle.o Swarm.o
 LINKEROPTIONS = -lm -lGL
 NVCCOPTIONS = -arch sm_75
 GXXFLAGS = -std=c++11
 
 program : $(OBJECTS)
-	nvcc $(OBJECTS) -o program $(LINKEROPTIONS)
+	nvcc $(OBJECTS) -o ParticleSwarm $(LINKEROPTIONS)
 OP.o : OP.cpp OP.h
-	g++ -c $(GXXFLAGS)
+	g++ -c OP.cpp
 Rastriging.o : Rastriging.cpp Rastriging.h
-	g++ -c $(GXXFLAGS)
+	g++ -c Rastriging.cpp
 Particle.o : Particle.cpp Particle.h
-	g++ -c $(GXXFLAGS)
+	g++ -c Particle.cpp
 ParticleSwarm.o : ParticleSwarm.cu 
 	nvcc -c cuda_code.cu $(NVCCOPTIONS)
 Swarm.o : Swarm.cu Swarm.h
