@@ -18,6 +18,9 @@
 #define W 0.8
 #define MAX_VEL 1.0
 
+/* Store curand random value states. */
+curandState_t *RNGstate;
+
 /**
 CUDA kernel for particle position and velocity updates.
 */

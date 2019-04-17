@@ -10,12 +10,6 @@
 // Clock
 #include <chrono>
 
-#include "cuda_runtime.h"
-#include "device_launch_parameters.h"
-// For RNG
-#include <cuda.h>
-#include <curand_kernel.h>
-
 class Swarm
 {
 public:
@@ -39,8 +33,6 @@ public:
 	list of positions so it's a true 1D array with decDim values. */
 	float *xbg;
 
-	/* Store curand random value states. */
-	curandState_t *RNGstate;
 	/* Problem's decision space dimension. */
 	const size_t decDim;
 	/* Amount of particles. */
@@ -67,8 +59,8 @@ public:
 	@param CUDAposvel Should CUDA be used to particles' position and velocity
 	updates. Causes initialization of curand RNG which takes a lot of time.
 	*/
-	__host__ Swarm(std::size_t size, const std::size_t dim, OP &problem, bool CUDAposvel);
-	__host__ ~Swarm();
+	Swarm(std::size_t size, const std::size_t dim, OP &problem, bool CUDAposvel);
+	~Swarm();
 
 	/**
 	 Updates all particles (position, velocity, function value) in the swarm.
@@ -85,23 +77,23 @@ public:
 	 Using blocks with less or equal to 256 threads may somethimes yield better
 	 accuracy because of how curand RNG works. I'm not sure about it though.
 	 */
-	__host__ void updateParticles(dim3 gridSize, dim3 blockSize);
+	void updateParticles(dim3 gridSize, dim3 blockSize);
 	/**
 	Copy particles to arrays for CUDA. Executed only if CUDAposvel = true.
 	*/
-	__host__ void particlesToArrays();
+	void particlesToArrays();
 	/**
 	Copy data back from arrays to particles for other calculations. Executed only if CUDAposvel = true.
 	*/
-	__host__ void arraysToParticles();
+	void arraysToParticles();
 	/**
 	Print best value of the swarm.
 	*/
-	__host__ void print();
+	void print();
 	/**
 	Print particles of the swarm.
 	*/
-	__host__ void printParticles();
+	void printParticles();
 
 
 private:
@@ -111,11 +103,11 @@ private:
 	/**
 	* Update current generation's best value to the swarm.
 	*/
-	__host__ void updateBest();
+	void updateBest();
 
 	/**
 	Random number between M and N. (For non-CUDA.)
 	*/
-	__host__ float randMToN(float M, float N);
+	float randMToN(float M, float N);
 };
 
