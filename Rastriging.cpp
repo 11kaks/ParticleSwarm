@@ -1,4 +1,3 @@
-
 #include "Rastriging.h"
 
 #include <vector>
@@ -20,7 +19,6 @@ Rastriging::~Rastriging() {
 }
 
 std::vector<std::vector<float>> Rastriging::getSearchRange() {
-	//std::cout << "Call for getSearchRange() in Rastriging-class" << std::endl;
 
 	std::vector<std::vector<float>> res(decDim);
 	float lim = 5.12f;

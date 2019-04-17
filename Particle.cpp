@@ -6,14 +6,12 @@
 
 Particle::Particle(std::vector<float> initialX, std::vector<float> initialV, OP &problem) :
 	x(initialX),
-	xOld(initialX),
 	xBest(initialX),
 	v(initialV),
-	vOld(initialV),
 	op(problem)
 {
 	fVal = problem.evaluate(initialX);
-	valBest = fVal;
+	fValBest = fVal;
 }
 
 
@@ -33,13 +31,11 @@ void Particle::updateVelPos(std::vector<float> direction) {
 }
 
 void Particle::updateFuncValue() {
-	// If penaltys are included, call to op.evaluate() will cause
-	// more than one function evaluation, so this is not actually 
-	// correct.
+
 	fVal = op.evaluate(x);
 
-	if(fVal < valBest) {
-		valBest = fVal;
+	if(fVal < fValBest) {
+		fValBest = fVal;
 		xBest = x;
 	}
 }

@@ -5,8 +5,6 @@
 
 #include "OP.h"
 
-
-
 /*
 Rastrigin function from: 
 https://en.wikipedia.org/wiki/Test_functions_for_optimization
@@ -18,6 +16,10 @@ class Rastriging : public OP
 {
 public:
 	Rastriging();
+	/**
+	Special constructor for Rastriging as it is defined in any-dimensional
+	decision space.
+	*/
 	Rastriging(const int decDim);
 	~Rastriging();
 

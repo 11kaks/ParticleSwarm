@@ -16,18 +16,12 @@ public:
 	std::vector<float> x;
 	/* Current velocity of the particle. */
 	std::vector<float> v;
-	/* Old position of the particle. */
-	std::vector<float> xOld;
-	/* Old velocity of the particle. */
-	std::vector<float> vOld;
 	/* Current value of the function. */
 	float fVal;
-	/* Particle's best position. */
+	/* Particle's best position ever encountered. */
 	std::vector<float> xBest;
 	/* Particle's best value corresponding to xBest.*/
-	float valBest;
-	/* Optimization problem. */
-	OP &op;
+	float fValBest;
 
 	/**
 	Create a new particle.
@@ -43,16 +37,9 @@ public:
 	/**
 	  Update velocity clamped to maxVel in any axis.
 	 */
-	void updateVelPos(std::vector<float> direction);
-
+	void updateVelPos(std::vector<float> direction);	
 	/**
-	  Update particle to a new position based on current velocity.
-	  The new velocity must be calculated before calling this.
-	 */
-	//void updatePosition();
-
-	/**
-	  Update function value and set best x and fVal if needed.
+	  Update function value and set xBest and fValBest if needed.
 	 */
 	void updateFuncValue();
 
@@ -74,6 +61,8 @@ private:
 	/* Maximum velocity along any coordinate axis. */
 	const float maxVel = 1.0f;
 
+	/* Optimization problem. */
+	OP &op;
 
 	/**
 	Random number in range [0,1[

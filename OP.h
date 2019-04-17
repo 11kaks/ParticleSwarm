@@ -6,7 +6,7 @@
 #define PI 3.14159265
 
 /*
-Optimization Problem
+Optimization Problem as a general interface.
 */
 class OP
 {
@@ -14,6 +14,7 @@ public:
 	OP() {};
 	~OP() {};
 
+	/* Name of the problem. Used in prints. */
 	std::string name;
 
 	/**
@@ -28,7 +29,7 @@ public:
 	 */
 	virtual std::vector<std::vector<float>> getSearchRange() = 0;
 
-	/*
+	/**
 	Get known optimum point to asses the accuracy of a run.
 	*/
 	virtual std::vector<float> getKnownOptimumPoint() = 0;
@@ -44,9 +45,9 @@ public:
 	int getObjDimension();
 
 	/**
-	  Evaluate objective functions at point x.
+	  Evaluate objective function at point x.
 	 
-	  @param x Point in decision space.
+	  @param point Point in decision space.
 	 
 	  @return Objective function value at given point.
 	 */
@@ -55,7 +56,7 @@ public:
 	/**
 	  Evaluate the amount of penalty at given point.
 	 
-	  @param x Point in desicion space.
+	  @param point Point in desicion space.
 	 
 	  @return Amount of penalty at given point.
 	 */
@@ -75,7 +76,7 @@ public:
 
 protected:
 	/* Decision space dimension. */
-	int decDim;
+	int decDim = 1;
 	/* Objective space dimension. */
 	int objDim = 1;
 };
