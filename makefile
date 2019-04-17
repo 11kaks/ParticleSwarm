@@ -12,9 +12,9 @@ Rastriging.o : Rastriging.cpp Rastriging.h
 Particle.o : Particle.cpp Particle.h
 	g++ -c Particle.cpp
 ParticleSwarm.o : ParticleSwarm.cu 
-	nvcc -c cuda_code.cu $(NVCCOPTIONS)
+	nvcc -c ParticleSwarm.cu $(NVCCOPTIONS)
 Swarm.o : Swarm.cu Swarm.h
-	nvcc -c cuda_code.cu $(NVCCOPTIONS)
+	nvcc -c Swarm.cu $(NVCCOPTIONS)
 
 clean :
 	-rm -f $(OBJECTS) 
