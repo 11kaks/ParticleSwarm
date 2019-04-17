@@ -18,14 +18,17 @@ NVCCOPTIONS = -arch sm_75
 GXXFLAGS = -std=c++11
 
 program : $(OBJECTS)
-nvcc $(OBJECTS) -o program $(LINKEROPTIONS)
+	nvcc $(OBJECTS) -o program $(LINKEROPTIONS)
 OP.o : OP.cpp OP.h
+	g++ -c $(GXXFLAGS)
 Rastriging.o : Rastriging.cpp Rastriging.h
+	g++ -c $(GXXFLAGS)
 Particle.o : Particle.cpp Particle.h
-g++ -c $(GXXFLAGS)
+	g++ -c $(GXXFLAGS)
 ParticleSwarm.o : ParticleSwarm.cu 
-Swarm.o :Swarm.cu Swarm.h
-nvcc -c cuda_code.cu $(NVCCOPTIONS)
+	nvcc -c cuda_code.cu $(NVCCOPTIONS)
+Swarm.o : Swarm.cu Swarm.h
+	nvcc -c cuda_code.cu $(NVCCOPTIONS)
 
 clean :
 	-rm -f $(OBJECTS) 
