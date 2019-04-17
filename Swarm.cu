@@ -198,7 +198,7 @@ __host__ int Swarm::updateParticles(dim3 gridSize, dim3 blockSize) {
 			std::chrono::microseconds durMemcpy1 = std::chrono::duration_cast<std::chrono::microseconds>(endMemcpy1 - startMemcpy1);
 
 			std::chrono::high_resolution_clock::time_point startPosVel = std::chrono::high_resolution_clock::now();
-			
+
 			// Kernel call
 			updateParticlePosVelKernel << <gridSize, blockSize >> > (devvv, devxx, devxb, devxbg, pitch, size, decDim, RNGstate);
 
@@ -276,17 +276,13 @@ __host__ int Swarm::updateParticles(dim3 gridSize, dim3 blockSize) {
 
 		// Without CUDA
 	} else {
+		std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
 		for(Particle *p : particles) {
-			std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
 			p->updateVelPos(bestParticle->x);
-			std::chrono::high_resolution_clock::time_point end = std::chrono::high_resolution_clock::now();
-			durPPosVel += std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-
-			start = std::chrono::high_resolution_clock::now();
 			p->updateFuncValue();
-			end = std::chrono::high_resolution_clock::now();
-			durPFun += std::chrono::duration_cast<std::chrono::microseconds>(end - start);
 		}
+		std::chrono::high_resolution_clock::time_point end = std::chrono::high_resolution_clock::now();
+		durPPosVel += std::chrono::duration_cast<std::chrono::microseconds>(end - start);
 		updateBest();
 	}
 	return 0;
